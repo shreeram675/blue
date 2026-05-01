@@ -857,49 +857,41 @@ function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(blueprintImg, 0, 0);
 
-  // Draw robot-width path corridor, clipped to free space
+  // Draw robot-width path corridor, clipped to raw-wall free space
   if (currentPath && currentPath.length > 1) {
     const robotWidthPx = Math.max(4, (robotWidthCm / realCmPerCell) * CS);
 
-    // Build the polyline helper (used in both branches)
-    function tracePath(c) {
-      c.beginPath();
-      currentPath.forEach((pt, i) => {
-        const x = pt.col * CS + CS / 2;
-        const y = pt.row * CS + CS / 2;
-        if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
-      });
-    }
-
     if (freeMaskImg) {
-      // Off-screen canvas: use source-in compositing so the stroke is
-      // clipped to only the opaque (free-cell) regions of the mask.
+      // ── Off-screen canvas approach ──────────────────────────────────────
+      // Correct compositing order:
+      //   1. Draw the full blue band (source-over, no clipping yet)
+      //   2. Apply destination-in with the raw-wall free mask
+      //      → keeps band pixels only where the mask is opaque (not a wall)
+      // This ensures the band is exactly robot-width wide up to the raw wall,
+      // never narrowing due to safety-margin inflation.
       const off = document.createElement('canvas');
       off.width  = canvas.width;
       off.height = canvas.height;
       const oc   = off.getContext('2d');
 
-      // Step 1 — draw free-space mask (opaque=free, transparent=obstacle)
-      oc.drawImage(freeMaskImg, 0, 0, canvas.width, canvas.height);
-
-      // Step 2 — new strokes only paint over opaque (free) pixels
-      oc.globalCompositeOperation = 'source-in';
-      oc.strokeStyle = 'rgba(37,99,235,0.70)';
+      // Step 1 — paint full-width blue band onto blank off-screen canvas
+      oc.strokeStyle = 'rgba(37,99,235,0.65)';
       oc.lineWidth   = robotWidthPx;
       oc.lineJoin    = 'round';
       oc.lineCap     = 'round';
-      tracePath(oc);
+      oc.beginPath();
+      currentPath.forEach((pt, i) => {
+        const x = pt.col * CS + CS / 2;
+        const y = pt.row * CS + CS / 2;
+        if (i === 0) oc.moveTo(x, y); else oc.lineTo(x, y);
+      });
       oc.stroke();
 
-      // Step 3 — dashed centerline for clarity (also clipped by mask)
-      oc.strokeStyle = 'rgba(255,255,255,0.55)';
-      oc.lineWidth   = Math.max(1, CS / 5);
-      oc.setLineDash([CS * 1.5, CS]);
-      tracePath(oc);
-      oc.stroke();
-      oc.setLineDash([]);
+      // Step 2 — destination-in: keep band only where mask is opaque (free)
+      oc.globalCompositeOperation = 'destination-in';
+      oc.drawImage(freeMaskImg, 0, 0, canvas.width, canvas.height);
+      oc.globalCompositeOperation = 'source-over';
 
-      // Step 4 — composite masked path onto main canvas
       ctx.drawImage(off, 0, 0);
     } else {
       // Fallback until mask loads: thin centerline
@@ -908,10 +900,33 @@ function redrawCanvas() {
       ctx.lineWidth   = Math.max(2, CS / 3);
       ctx.lineJoin    = 'round';
       ctx.lineCap     = 'round';
-      tracePath(ctx);
+      ctx.beginPath();
+      currentPath.forEach((pt, i) => {
+        const x = pt.col * CS + CS / 2;
+        const y = pt.row * CS + CS / 2;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
       ctx.stroke();
       ctx.restore();
     }
+
+    // Centerline drawn directly on main canvas — always geometrically centred
+    // regardless of how the band was asymmetrically clipped by the mask.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.70)';
+    ctx.lineWidth   = Math.max(1, CS / 5);
+    ctx.lineJoin    = 'round';
+    ctx.lineCap     = 'round';
+    ctx.setLineDash([CS * 1.5, CS]);
+    ctx.beginPath();
+    currentPath.forEach((pt, i) => {
+      const x = pt.col * CS + CS / 2;
+      const y = pt.row * CS + CS / 2;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   // Goal marker

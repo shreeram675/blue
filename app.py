@@ -682,24 +682,25 @@ def draw_rotated_rect(img, row, col, robot_params, cell_px, color, heading=0):
 
 @app.route("/free-mask.png")
 def free_mask():
-    """RGBA PNG: free cells = white opaque, obstacle cells = transparent.
-    Used by the canvas client for robot-width path clipping."""
-    if not state["inflated_grid"]:
+    """RGBA PNG: free cells = white opaque, wall cells = transparent.
+    Uses the RAW grid (not inflated) so the path band can reach up to the
+    actual wall surface — the robot body legitimately sweeps the safety-margin
+    zone, so we must not clip there."""
+    if not state["raw_grid"]:
         return "", 204
 
-    grid_np  = np.array(state["inflated_grid"], dtype=np.uint8)
-    h, w     = grid_np.shape
-    cell_px  = state["cell_size_px"]
+    grid_np = np.array(state["raw_grid"], dtype=np.uint8)
+    h, w    = grid_np.shape
+    cell_px = state["cell_size_px"]
 
     free = (grid_np == 0).astype(np.uint8)
-    # Upscale cell mask to pixel resolution (BGRA order for OpenCV)
     free_px = np.kron(free, np.ones((cell_px, cell_px), dtype=np.uint8))
     img = np.zeros((h * cell_px, w * cell_px, 4), dtype=np.uint8)
     val = free_px * 255
     img[:, :, 0] = val  # B
     img[:, :, 1] = val  # G
     img[:, :, 2] = val  # R
-    img[:, :, 3] = val  # A  (0 = obstacle, 255 = free)
+    img[:, :, 3] = val  # A  (0 = raw wall, 255 = free)
 
     _, buffer = cv2.imencode('.png', img)
     return send_file(BytesIO(buffer.tobytes()), mimetype='image/png')
