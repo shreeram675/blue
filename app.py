@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from blueprint_parser import parse_blueprint, estimate_scale_from_room_positions
 from grid_generator import generate_grid, find_narrow_passages
-from astar import astar, smooth_path, path_to_commands
+from astar import astar, path_to_commands
 from flask import send_file
 from io import BytesIO
 from firebase_queue import firebase_queue
@@ -10,6 +10,8 @@ import os
 import uuid
 import numpy as np
 import cv2
+import threading
+import time
 
 ROBOT_ID = "wheelchair_01"
 
@@ -35,7 +37,61 @@ state = {
     "cell_size_px": 10,
     "robot_params": {"robot_width_cm": 60.0, "safety_margin_cm": 10.0},
     "robot_id": ROBOT_ID,
+    "last_synced_seq": 0,   # highest command sequence confirmed DONE via Firebase
 }
+
+# ── FIREBASE POSE SYNC (background thread) ────────────────────────────────
+# Watches /robots/<id>/queue every 1.5 s for DONE commands and replays them
+# to keep state["robot_pose"] current without needing the ESP32 on the same LAN.
+def _sync_pose_from_firebase():
+    if not firebase_queue.enabled:
+        return
+    if not state.get("nav_start_pose") or not state.get("all_commands"):
+        return
+    try:
+        queue_data = firebase_queue._db.reference(
+            f"/robots/{ROBOT_ID}/queue"
+        ).get()
+    except Exception:
+        return
+    if not queue_data:
+        return
+
+    # Walk cmd_1, cmd_2, … in order; stop at first non-DONE
+    done_seq = 0
+    for i in range(1, len(state["all_commands"]) + 1):
+        item = queue_data.get(f"cmd_{i}")
+        if item and item.get("status") == "DONE":
+            done_seq = i
+        else:
+            break
+
+    if done_seq <= state["last_synced_seq"]:
+        return
+
+    sp = state["nav_start_pose"]
+    new_r, new_c, new_h = _replay_commands(
+        sp["row"], sp["col"], sp["heading"],
+        state["all_commands"][:done_seq],
+        state["real_cm_per_cell"],
+    )
+    state["robot_pose"]    = {"row": new_r, "col": new_c, "heading": new_h}
+    state["last_synced_seq"] = done_seq
+    print(f"   Firebase sync: cmd_{done_seq} DONE → pose ({new_r},{new_c}) h={new_h}°")
+    try:
+        firebase_queue.publish_status(ROBOT_ID, state["robot_pose"])
+    except Exception:
+        pass
+
+
+def _firebase_sync_loop():
+    while True:
+        try:
+            _sync_pose_from_firebase()
+        except Exception as e:
+            print(f"   Firebase sync error: {e}")
+        time.sleep(1.5)
+
 
 @app.route("/")
 def index():
@@ -143,6 +199,8 @@ def upload():
             "robot_width_cm":         robot_width_cm,
             "robot_length_cm":        robot_length_cm,
             "has_grid":               True,
+            "raw_grid":               state["raw_grid"],
+            "inflated_grid":          state["inflated_grid"],
         })
 
     except Exception as e:
@@ -407,18 +465,18 @@ def navigate():
                 "blocked_near": list(hint) if hint else None,
             }), 400
 
-        smoothed = smooth_path(path, grid_np)
         commands = path_to_commands(
-            smoothed,
+            path,
             cell_size_cm=10,
             initial_heading=heading,
             real_cm_per_cell=state["real_cm_per_cell"],
         )
 
-        state["command_queue"]  = list(commands)
-        state["all_commands"]   = list(commands)
-        state["current_path"]   = path
-        state["nav_start_pose"] = dict(state["robot_pose"])
+        state["command_queue"]   = list(commands)
+        state["all_commands"]    = list(commands)
+        state["current_path"]    = path
+        state["nav_start_pose"]  = dict(state["robot_pose"])
+        state["last_synced_seq"] = 0   # reset so sync thread re-scans from cmd_1
 
         # ── Firebase: publish command queue ───────────────────────────────
         try:
@@ -541,45 +599,6 @@ def _replay_commands(start_row, start_col, start_heading, commands, real_cm_per_
     return round(row), round(col), d % 360
 
 
-def _path_from_commands(start_row, start_col, heading, commands, real_cm_per_cell):
-    """Reconstruct grid path from degree-based motion commands."""
-    import math as _m
-    DEG_DIR = {
-        0: (-1, 0), 45: (-1, 1), 90: (0, 1), 135: (1, 1),
-        180: (1, 0), 225: (1, -1), 270: (0, -1), 315: (-1, -1),
-    }
-    SQRT2 = _m.sqrt(2)
-
-    row, col, d = float(start_row), float(start_col), int(heading) % 360
-    pts = [(start_row, start_col)]
-
-    for cmd in commands:
-        if cmd.startswith('R'):
-            d = (d + int(cmd[1:])) % 360
-        elif cmd.startswith('L'):
-            d = (d - int(cmd[1:])) % 360
-        elif cmd.startswith('F'):
-            dist_cm = float(cmd[1:])
-            dr, dc = DEG_DIR.get(d, (-1, 0))
-            is_diag = (dr != 0 and dc != 0)
-            cm_per_step = real_cm_per_cell * (SQRT2 if is_diag else 1.0)
-            steps = round(dist_cm / cm_per_step)
-            for s in range(1, steps + 1):
-                pts.append((round(row + dr * s), round(col + dc * s)))
-            row += dr * steps
-            col += dc * steps
-        elif cmd.startswith('B'):
-            dist_cm = float(cmd[1:])
-            dr, dc = DEG_DIR.get(d, (-1, 0))
-            is_diag = (dr != 0 and dc != 0)
-            cm_per_step = real_cm_per_cell * (SQRT2 if is_diag else 1.0)
-            steps = round(dist_cm / cm_per_step)
-            for s in range(1, steps + 1):
-                pts.append((round(row - dr * s), round(col - dc * s)))
-            row -= dr * steps
-            col -= dc * steps
-
-    return pts
 
 
 # ── ROUTE 8: Path overlay ─────────────────────────────────────────────────
@@ -680,30 +699,37 @@ def draw_rotated_rect(img, row, col, robot_params, cell_px, color, heading=0):
     cv2.drawContours(img, [box], 0, color, -1)
     cv2.drawContours(img, [box], 0, (255, 255, 255), 2)
 
+def _make_mask_png(grid_np, cell_px):
+    """RGBA PNG helper: free cells (==0) → alpha 255, wall cells → alpha 0."""
+    h, w    = grid_np.shape
+    free    = (grid_np == 0).astype(np.uint8)
+    free_px = np.kron(free, np.ones((cell_px, cell_px), dtype=np.uint8))
+    img     = np.zeros((h * cell_px, w * cell_px, 4), dtype=np.uint8)
+    val     = free_px * 255
+    img[:, :, 0] = val
+    img[:, :, 1] = val
+    img[:, :, 2] = val
+    img[:, :, 3] = val
+    _, buf = cv2.imencode('.png', img)
+    return send_file(BytesIO(buf.tobytes()), mimetype='image/png')
+
 @app.route("/free-mask.png")
 def free_mask():
-    """RGBA PNG: free cells = white opaque, wall cells = transparent.
-    Uses the RAW grid (not inflated) so the path band can reach up to the
-    actual wall surface — the robot body legitimately sweeps the safety-margin
-    zone, so we must not clip there."""
+    """Inflated-grid mask — used as belt-and-suspenders for path-centre clip."""
+    if not state["inflated_grid"]:
+        return "", 204
+    return _make_mask_png(np.array(state["inflated_grid"], dtype=np.uint8),
+                          state["cell_size_px"])
+
+@app.route("/raw-mask.png")
+def raw_mask():
+    """Raw-grid mask — actual structural walls only (no safety-margin inflation).
+    Used to clip the robot-width corridor so it stops at real walls but is
+    allowed to occupy the safety-margin buffer the robot body passes through."""
     if not state["raw_grid"]:
         return "", 204
-
-    grid_np = np.array(state["raw_grid"], dtype=np.uint8)
-    h, w    = grid_np.shape
-    cell_px = state["cell_size_px"]
-
-    free = (grid_np == 0).astype(np.uint8)
-    free_px = np.kron(free, np.ones((cell_px, cell_px), dtype=np.uint8))
-    img = np.zeros((h * cell_px, w * cell_px, 4), dtype=np.uint8)
-    val = free_px * 255
-    img[:, :, 0] = val  # B
-    img[:, :, 1] = val  # G
-    img[:, :, 2] = val  # R
-    img[:, :, 3] = val  # A  (0 = raw wall, 255 = free)
-
-    _, buffer = cv2.imencode('.png', img)
-    return send_file(BytesIO(buffer.tobytes()), mimetype='image/png')
+    return _make_mask_png(np.array(state["raw_grid"], dtype=np.uint8),
+                          state["cell_size_px"])
 
 
 @app.route("/debug_grid.png")
@@ -877,6 +903,10 @@ def manual_move():
 
 
 if __name__ == "__main__":
+    # Start Firebase pose-sync watcher (daemon so it exits when Flask exits)
+    _t = threading.Thread(target=_firebase_sync_loop, daemon=True)
+    _t.start()
+
     print(f"   Firebase: {'enabled' if firebase_queue.enabled else 'disabled -- set FIREBASE_CREDENTIALS and FIREBASE_DATABASE_URL'}")
     print("Routes:")
     print("  POST /upload         upload blueprint image")
@@ -891,4 +921,4 @@ if __name__ == "__main__":
     print("  GET  /debug_grid.png debug grid")
     print("  POST /manual-move    d-pad manual movement")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)

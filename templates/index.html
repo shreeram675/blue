@@ -679,6 +679,8 @@ let lastPoseKey     = "";
 let pollIntervalMs  = 3000;
 let _pollId         = null;
 let freeMaskImg     = null;
+let rawMaskImg      = null;
+let showPathOnCanvas = true;
 
 // ── LOGGING ───────────────────────────────────────────────────────────────
 function log(msg, type = "info") {
@@ -729,6 +731,7 @@ async function uploadBlueprint() {
     realCmPerCell       = data.real_cm_per_cell || 10.0;
     robotWidthCm        = data.robot_width_cm  || parseFloat(robotWidth);
     robotLengthCm       = data.robot_length_cm || parseFloat(robotLength);
+    wallGrid            = data.inflated_grid || data.raw_grid || null;
 
     if (data.scale_cm_per_pixel) {
       log(`Scale auto-detected: ${data.scale_cm_per_pixel.toFixed(4)} cm/px`, "ok");
@@ -811,13 +814,22 @@ function syncOverlaySizes(canvas) {
 
 function loadOverlays() {
   const canvas = document.getElementById("blueprintCanvas");
-  const gridEl = document.getElementById("gridOverlay");
-  const pathEl = document.getElementById("pathOverlay");
   const t = Date.now();
-  gridEl.src = `/grid.png?t=${t}`;
-  pathEl.src = `/path.png?t=${t}`;
 
-  // Load free-space mask for robot-width canvas path clipping
+  // Grid overlay only — path is drawn directly on the canvas
+  document.getElementById("gridOverlay").src = `/grid.png?t=${t}`;
+  // Keep pathOverlay hidden; canvas handles path rendering
+  document.getElementById("pathOverlay").classList.add("hidden");
+  document.getElementById("pathOverlay").classList.remove("active");
+
+  // Raw-grid mask: clips robot-width corridor to actual walls (not safety buffer)
+  const rm = new Image();
+  rm.crossOrigin = 'anonymous';
+  rm.onload  = () => { rawMaskImg = rm; redrawCanvas(); };
+  rm.onerror = () => { rawMaskImg = null; };
+  rm.src = `/raw-mask.png?t=${t}`;
+
+  // Inflated-grid mask: belt-and-suspenders clip for the path centre line
   const fm = new Image();
   fm.crossOrigin = 'anonymous';
   fm.onload  = () => { freeMaskImg = fm; redrawCanvas(); };
@@ -829,22 +841,26 @@ function loadOverlays() {
 }
 
 function loadPathOverlay() {
-  document.getElementById("pathOverlay").src = `/path.png?t=${Date.now()}`;
-  toggleOverlays();
+  // Path is canvas-drawn; just redraw canvas to update
+  redrawCanvas();
 }
 
 function toggleOverlays() {
   const canvas = document.getElementById("blueprintCanvas");
   syncOverlaySizes(canvas);
-  
+
   const showGrid = document.getElementById("toggleGrid").checked;
-  const showPath = document.getElementById("togglePath").checked;
-  
+  showPathOnCanvas = document.getElementById("togglePath").checked;
+
+  // Grid overlay — server-rendered PNG
   document.getElementById("gridOverlay").classList.toggle("hidden", !showGrid);
-  document.getElementById("pathOverlay").classList.toggle("hidden", !showPath);
-  
   document.getElementById("gridOverlay").classList.toggle("active", showGrid);
-  document.getElementById("pathOverlay").classList.toggle("active", showPath);
+
+  // Path overlay img is permanently unused; canvas handles path drawing
+  document.getElementById("pathOverlay").classList.add("hidden");
+  document.getElementById("pathOverlay").classList.remove("active");
+
+  redrawCanvas();
 }
 
 // ── CANVAS REDRAW ─────────────────────────────────────────────────────────
@@ -857,63 +873,55 @@ function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(blueprintImg, 0, 0);
 
-  // Draw robot-width path corridor, clipped to raw-wall free space
-  if (currentPath && currentPath.length > 1) {
-    const robotWidthPx = Math.max(4, (robotWidthCm / realCmPerCell) * CS);
+  // Draw robot-width corridor clipped to inflated-grid free space
+  if (showPathOnCanvas && currentPath && currentPath.length > 1) {
+    const robotWidthPx = Math.max(CS, (robotWidthCm / realCmPerCell) * CS);
 
-    if (freeMaskImg) {
-      // ── Off-screen canvas approach ──────────────────────────────────────
-      // Correct compositing order:
-      //   1. Draw the full blue band (source-over, no clipping yet)
-      //   2. Apply destination-in with the raw-wall free mask
-      //      → keeps band pixels only where the mask is opaque (not a wall)
-      // This ensures the band is exactly robot-width wide up to the raw wall,
-      // never narrowing due to safety-margin inflation.
-      const off = document.createElement('canvas');
-      off.width  = canvas.width;
-      off.height = canvas.height;
-      const oc   = off.getContext('2d');
-
-      // Step 1 — paint full-width blue band onto blank off-screen canvas
-      oc.strokeStyle = 'rgba(37,99,235,0.65)';
-      oc.lineWidth   = robotWidthPx;
-      oc.lineJoin    = 'round';
-      oc.lineCap     = 'round';
-      oc.beginPath();
-      currentPath.forEach((pt, i) => {
-        const x = pt.col * CS + CS / 2;
-        const y = pt.row * CS + CS / 2;
-        if (i === 0) oc.moveTo(x, y); else oc.lineTo(x, y);
-      });
-      oc.stroke();
-
-      // Step 2 — destination-in: keep band only where mask is opaque (free)
-      oc.globalCompositeOperation = 'destination-in';
-      oc.drawImage(freeMaskImg, 0, 0, canvas.width, canvas.height);
-      oc.globalCompositeOperation = 'source-over';
-
-      ctx.drawImage(off, 0, 0);
-    } else {
-      // Fallback until mask loads: thin centerline
-      ctx.save();
-      ctx.strokeStyle = 'rgba(37,99,235,0.75)';
-      ctx.lineWidth   = Math.max(2, CS / 3);
-      ctx.lineJoin    = 'round';
-      ctx.lineCap     = 'round';
-      ctx.beginPath();
-      currentPath.forEach((pt, i) => {
-        const x = pt.col * CS + CS / 2;
-        const y = pt.row * CS + CS / 2;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-      ctx.restore();
+    // ── Step 1: build the free-space mask from inflated grid data ────────────
+    // Uses EXACTLY the same coordinate formula as the corridor stroke below
+    // (c * CS, r * CS, CS, CS) so alignment is mathematically guaranteed.
+    const maskOff = document.createElement('canvas');
+    maskOff.width  = canvas.width;
+    maskOff.height = canvas.height;
+    if (wallGrid) {
+      const mc = maskOff.getContext('2d');
+      mc.fillStyle = '#fff';
+      for (let r = 0; r < wallGrid.length; r++) {
+        const row = wallGrid[r];
+        for (let c = 0; c < row.length; c++) {
+          if (row[c] === 0) mc.fillRect(c * CS, r * CS, CS, CS);
+        }
+      }
     }
 
-    // Centerline drawn directly on main canvas — always geometrically centred
-    // regardless of how the band was asymmetrically clipped by the mask.
+    // ── Step 2: draw corridor on off-screen canvas then clip to mask ─────────
+    const off = document.createElement('canvas');
+    off.width  = canvas.width;
+    off.height = canvas.height;
+    const oc   = off.getContext('2d');
+
+    oc.strokeStyle = 'rgba(37,99,235,0.55)';
+    oc.lineWidth   = robotWidthPx;
+    oc.lineJoin    = 'round';
+    oc.lineCap     = 'round';
+    oc.beginPath();
+    currentPath.forEach((pt, i) => {
+      const x = pt.col * CS + CS / 2;
+      const y = pt.row * CS + CS / 2;
+      if (i === 0) oc.moveTo(x, y); else oc.lineTo(x, y);
+    });
+    oc.stroke();
+
+    // destination-in: keep corridor pixels only where mask is opaque (free cells)
+    oc.globalCompositeOperation = 'destination-in';
+    oc.drawImage(maskOff, 0, 0);
+    oc.globalCompositeOperation = 'source-over';
+
+    ctx.drawImage(off, 0, 0);
+
+    // ── Step 3: dashed centre line on top ────────────────────────────────────
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.70)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth   = Math.max(1, CS / 5);
     ctx.lineJoin    = 'round';
     ctx.lineCap     = 'round';
@@ -1142,9 +1150,8 @@ async function navigateTo(roomName) {
     const [startRow, startCol] = data.start;
     const [goalRow,  goalCol]  = data.goal;
     navGoal     = { row: goalRow, col: goalCol };
-    currentPath = data.path
-      ? data.path.map(p => ({ row: p[0], col: p[1] }))
-      : commandsToPath(startRow, startCol, robotPose.heading, fullCmdList);
+    // Use raw BFS path cells from server — guaranteed wall-free by BFS contract.
+    currentPath = (data.path || []).map(p => ({ row: p[0], col: p[1] }));
 
     redrawCanvas();
     loadPathOverlay();
@@ -1292,7 +1299,10 @@ function resetAll() {
   robotWidthCm  = 60.0;
   robotLengthCm = 90.0;
   lastPoseKey   = "";
-  freeMaskImg   = null;
+  freeMaskImg      = null;
+  rawMaskImg       = null;
+  wallGrid         = null;
+  showPathOnCanvas = true;
   pollIntervalMs = 3000;
   clearInterval(_pollId);
   _pollId = setInterval(pollStatus, pollIntervalMs);
