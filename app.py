@@ -802,7 +802,7 @@ def manual_move():
         import math as _math
         data      = request.get_json(silent=True) or {}
         direction = data.get("dir", "S")
-        step_cm   = float(data.get("step_cm", 50.0))
+        step_cm   = float(data.get("step_cm", 10.0))
         turn_deg  = int(data.get("turn_deg", 90))
 
         row     = state["robot_pose"]["row"]
@@ -875,9 +875,10 @@ def manual_move():
             return jsonify({"ok": False, "error": f"Unknown direction: {direction}"}), 400
 
         # Push to Firebase queue — pose updates only when /command-done is received
-        state["nav_start_pose"] = dict(state["robot_pose"])
-        state["all_commands"]   = [cmd]
-        state["command_queue"]  = [cmd]
+        state["nav_start_pose"]  = dict(state["robot_pose"])
+        state["all_commands"]    = [cmd]
+        state["command_queue"]   = [cmd]
+        state["last_synced_seq"] = 0
 
         try:
             firebase_queue.publish_queue(ROBOT_ID, [cmd])

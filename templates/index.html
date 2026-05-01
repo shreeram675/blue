@@ -1337,7 +1337,7 @@ function resetAll() {
 
 // ── MANUAL CONTROLS ───────────────────────────────────────────────────────
 async function manualMove(dir) {
-  const labels = { F:"Forward 50cm", B:"Backward 50cm", L:"Left 90°", R:"Right 90°", S:"STOP" };
+  const labels = { F:"Forward 10cm", B:"Backward 10cm", L:"Left 90°", R:"Right 90°", S:"STOP" };
   if (!poseSet && dir !== "S") { log("Set robot position first", "err"); return; }
   log(`Manual: ${labels[dir] || dir}`);
   try {
