@@ -1264,13 +1264,14 @@ async function pollStatus() {
       }
     }
 
-    if (fullCmdList.length > 0 && Array.isArray(data.command_queue)) {
-      const consumed = Math.max(0, fullCmdList.length - data.command_queue.length);
-      document.getElementById("statQueue").textContent = data.command_queue.length;
+    if (fullCmdList.length > 0) {
+      const consumed = data.last_synced_seq || 0;
+      document.getElementById("statQueue").textContent = Math.max(0, fullCmdList.length - consumed);
       renderCommandQueue(fullCmdList, consumed);
 
       // Poll faster while commands are actively executing
-      const desired = data.command_queue.length > 0 ? 1000 : 3000;
+      const remaining = fullCmdList.length - consumed;
+      const desired = remaining > 0 ? 1000 : 3000;
       if (desired !== pollIntervalMs) {
         pollIntervalMs = desired;
         clearInterval(_pollId);
@@ -1415,9 +1416,19 @@ function startVoice() {
     log(`Voice: "${transcript}"`);
     document.getElementById("voiceStatus").textContent = `Heard: "${transcript}"`;
 
+    const NAV_PHRASES = [
+      'i need to go to', 'i want to go to', 'take me to', 'bring me to',
+      'navigate to', 'drive to', 'proceed to', 'get me to', 'lets go to',
+      "let's go to", 'head to', 'move to', 'go to',
+    ];
+    let cleaned = transcript;
+    for (const p of NAV_PHRASES) {
+      if (cleaned.includes(p)) { cleaned = cleaned.replace(p, '').trim(); break; }
+    }
     const match = parsedRooms.find(r =>
-      transcript.includes(r.name.toLowerCase()) ||
-      r.name.toLowerCase().includes(transcript)
+      cleaned.includes(r.name.toLowerCase()) ||
+      r.name.toLowerCase().includes(cleaned) ||
+      transcript.includes(r.name.toLowerCase())
     );
     if (match) {
       log(`Voice matched: ${match.name}`, "ok");

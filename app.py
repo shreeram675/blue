@@ -519,6 +519,7 @@ def status():
         "raw_free_pct":     round(raw_free_pct, 1),
         "robot_params":     state["robot_params"],
         "firebase_enabled": firebase_queue.enabled,
+        "last_synced_seq":  state["last_synced_seq"],
     })
 
 # ── ROUTE 6: ESP32 polls for next command ─────────────────────────────────
