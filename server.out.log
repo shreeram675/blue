@@ -1,0 +1,15 @@
+   Firebase: disabled -- set FIREBASE_CREDENTIALS and FIREBASE_DATABASE_URL
+Routes:
+  POST /upload         upload blueprint image
+  GET  /is-free        check robot placement validity
+  POST /set-pose       set robot start position (validated)
+  POST /navigate       navigate to a room
+  GET  /status         get system status
+  GET  /get-command    ESP32 polls for next command
+  POST /command-done   ESP32 confirms command executed
+  GET  /grid.png       grid overlay (raw walls dark red + inflated yellow)
+  GET  /path.png       path overlay
+  GET  /debug_grid.png debug grid
+  POST /manual-move    d-pad manual movement
+ * Serving Flask app 'app'
+ * Debug mode: on
