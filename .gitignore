@@ -1,0 +1,12 @@
+venv/
+.env
+.env.local
+firebase_key.json
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+uploads/
+esp32_firmware.ino
+.claude/
+firebase-adminsdk*.json

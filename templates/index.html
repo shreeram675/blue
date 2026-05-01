@@ -1,0 +1,1507 @@
+si<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blueprint Navigation System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #f0f4f8;
+      --surface:   #ffffff;
+      --surface2:  #f8fafc;
+      --border:    #e2e8f0;
+      --border2:   #cbd5e1;
+      --text:      #1e293b;
+      --text-muted:#64748b;
+      --accent:    #2563eb;
+      --accent-h:  #1d4ed8;
+      --accent-lt: #eff6ff;
+      --green:     #16a34a;
+      --green-lt:  #dcfce7;
+      --red:       #dc2626;
+      --red-lt:    #fee2e2;
+      --amber:     #d97706;
+      --amber-lt:  #fef3c7;
+      --radius:    10px;
+      --shadow:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.10);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.25rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .header-logo {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      flex: 1;
+      white-space: nowrap;
+    }
+
+    header h1 span { color: var(--accent); }
+
+    .badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+      background: var(--border);
+      color: var(--text-muted);
+    }
+    .badge.ok     { background: var(--green-lt);  color: var(--green); }
+    .badge.warn   { background: var(--red-lt);    color: var(--red); }
+    .badge.active { background: var(--accent-lt); color: var(--accent); }
+
+    /* ── LAYOUT ─────────────────────────────────────────────────────── */
+    .container {
+      display: grid;
+      grid-template-columns: 300px 1fr 280px;
+      gap: 1rem;
+      padding: 1rem;
+      height: calc(100vh - 56px);
+    }
+
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-section { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    h2 {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0.1rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      display: block;
+    }
+
+    input[type=file], input[type=number], select {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+    input[type=file]:hover, input[type=number]:hover, select:hover { border-color: var(--border2); }
+    input[type=file]:focus, input[type=number]:focus, select:focus  { border-color: var(--accent); }
+
+    .field-hint {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* ── BUTTONS ────────────────────────────────────────────────────── */
+    button {
+      width: 100%;
+      padding: 13px 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.08s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+    button:not(:disabled):active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(37,99,235,.35);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-h);
+      box-shadow: 0 4px 12px rgba(37,99,235,.4);
+    }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1.5px solid var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--border);
+      border-color: var(--border2);
+    }
+
+    .btn-danger {
+      background: var(--red-lt);
+      color: var(--red);
+      border: 1.5px solid #fca5a5;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: #fecaca;
+    }
+
+    /* ── ROOM BUTTONS ────────────────────────────────────────────────── */
+    #roomButtons {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .room-btn {
+      background: var(--surface2);
+      color: var(--text);
+      text-align: left;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: 1.5px solid var(--border);
+      justify-content: flex-start;
+      transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+    }
+    .room-btn:hover:not(:disabled) {
+      background: var(--accent-lt);
+      border-color: #93c5fd;
+    }
+    .room-btn.selected {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      box-shadow: 0 2px 8px rgba(37,99,235,.3);
+    }
+    .room-btn.selected .room-dim { color: rgba(255,255,255,0.65); }
+
+    .room-dim {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 400;
+      margin-left: auto;
+    }
+
+    /* ── STATUS ROWS ─────────────────────────────────────────────────── */
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .stat-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-val   { font-size: 1rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+    /* ── MAP AREA ────────────────────────────────────────────────────── */
+    .map-area {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .map-toolbar {
+      background: var(--surface2);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 0.78rem;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .map-toolbar label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 500;
+      user-select: none;
+    }
+    .map-toolbar input[type=checkbox] {
+      accent-color: var(--accent);
+      width: auto;
+      width: 15px;
+      height: 15px;
+    }
+    #canvasInfo {
+      margin-left: auto;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-family: monospace;
+    }
+
+    .canvas-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+      background: #f8fafc;
+    }
+
+    .canvas-inner {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    #blueprintCanvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: none;
+      z-index: 1;
+      cursor: crosshair;
+    }
+
+    .canvas-placeholder {
+      text-align: center;
+      pointer-events: none;
+      color: var(--text-muted);
+    }
+    .canvas-placeholder .icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+    .canvas-placeholder p { font-size: 0.9rem; font-weight: 500; }
+    .canvas-placeholder small { font-size: 0.75rem; opacity: 0.7; }
+
+    /* ── OVERLAYS ────────────────────────────────────────────────────── */
+    .overlay-img {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      opacity: 0.4;
+      transition: opacity 0.2s ease;
+      z-index: 2;
+    }
+    .overlay-img.active { opacity: 0.6; }
+
+    .overlay-img.hidden {
+      display: none;
+    }
+
+    /* ── SPINNER ─────────────────────────────────────────────────────── */
+    .spinner-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(248,250,252,0.92);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+      z-index: 10;
+    }
+    .spinner-overlay.active { display: flex; }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner-text { color: var(--text);       font-size: 0.95rem; font-weight: 600; }
+    .spinner-sub  { color: var(--text-muted); font-size: 0.78rem; }
+
+    /* ── COMMAND QUEUE ───────────────────────────────────────────────── */
+    .cmd-list {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 0.78rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      max-height: 140px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .cmd-done    { color: var(--border2); text-decoration: line-through; padding: 2px 6px; }
+    .cmd-active  { color: var(--green); font-weight: 700; background: var(--green-lt); padding: 3px 8px; border-radius: 5px; border-left: 3px solid var(--green); }
+    .cmd-pending { color: var(--text-muted); padding: 2px 6px; }
+    .cmd-empty   { color: var(--text-muted); font-style: italic; padding: 2px 6px; }
+
+    /* ── LOG ─────────────────────────────────────────────────────────── */
+    .log {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.72rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      max-height: 110px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .log-err  { color: #f87171; }
+    .log-info { color: #93c5fd; }
+    .log-ok   { color: #86efac; }
+
+    /* ── MANUAL D-PAD ────────────────────────────────────────────────── */
+    .dpad {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    .dpad button {
+      padding: 14px;
+      font-size: 1.1rem;
+    }
+
+    /* ── VOICE ───────────────────────────────────────────────────────── */
+    .btn-voice {
+      background: #f5f3ff;
+      color: #7c3aed;
+      border: 1.5px solid #ddd6fe;
+      font-weight: 600;
+    }
+    .btn-voice:hover:not(:disabled) { background: #ede9fe; border-color: #c4b5fd; }
+    .btn-voice.listening {
+      background: var(--red-lt);
+      color: var(--red);
+      border-color: #fca5a5;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+    /* ── SCROLLBARS ──────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ── MOBILE ──────────────────────────────────────────────────────── */
+    @media (max-width: 960px) {
+      .container { grid-template-columns: 1fr; height: auto; }
+      .map-area  { height: 65vw; min-height: 260px; }
+      .panel     { max-height: none; }
+    }
+
+    /* ── TOAST ───────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      top: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 24px;
+      border-radius: 24px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      white-space: nowrap;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      box-shadow: var(--shadow-md);
+      transform: translateX(-50%) translateY(-6px);
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── DIVIDER ─────────────────────────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0.25rem 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">&#x1F5FA;</div>
+  <h1><span>Blueprint</span> Navigation</h1>
+  <span class="badge" id="parseBadge">No blueprint</span>
+  <span class="badge" id="connectBadge">Connecting&hellip;</span>
+  <button class="btn-danger" onclick="resetAll()"
+          style="width:auto;padding:8px 16px;font-size:0.8rem;margin-left:auto">
+    &#8635; Reset
+  </button>
+</header>
+
+<div class="container">
+
+  <!-- ── LEFT: Setup ─────────────────────────────────────────────────── -->
+  <div class="panel">
+
+    <div class="panel-section">
+      <h2>Blueprint</h2>
+      <label>Image file</label>
+      <input type="file" id="blueprintFile" accept="image/*">
+      <label>Unit (room dimensions on blueprint)</label>
+      <select id="unitSelect">
+        <option value="ft" selected>Feet (ft)</option>
+        <option value="cm">Centimetres (cm)</option>
+        <option value="m">Metres (m)</option>
+      </select>
+      <p class="field-hint">Scale is auto-calculated from room dimensions &mdash; no manual width needed</p>
+      <label>Robot width (cm) &mdash; side-to-side</label>
+      <input type="number" id="robotWidth" value="60" min="10" step="1">
+      <label>Robot length (cm) &mdash; front-to-back</label>
+      <input type="number" id="robotLength" value="90" min="10" step="1">
+      <label>Safety margin (cm)</label>
+      <input type="number" id="safetyMargin" value="10" min="0" step="1">
+      <button class="btn-primary" id="uploadBtn" onclick="uploadBlueprint()">
+        &#x1F4E4; Upload &amp; Parse
+      </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="panel-section">
+      <h2>Robot Start</h2>
+      <label>Initial Heading</label>
+      <select id="headingSelect">
+        <option value="0">North — 0°</option>
+        <option value="45">NE — 45°</option>
+        <option value="90">East — 90°</option>
+        <option value="135">SE — 135°</option>
+        <option value="180">South — 180°</option>
+        <option value="225">SW — 225°</option>
+        <option value="270">West — 270°</option>
+        <option value="315">NW — 315°</option>
+      </select>
+      <p class="field-hint">Click the map to place the robot start position</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="panel-section" style="flex:1;min-height:0">
+      <h2>Rooms</h2>
+      <div id="roomButtons">
+        <p class="field-hint" style="padding:8px 0">Upload a blueprint to see rooms</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── CENTRE: Map ──────────────────────────────────────────────────── -->
+  <div class="map-area">
+
+    <div class="map-toolbar">
+      <label>
+        <input type="checkbox" id="toggleGrid" checked onchange="toggleOverlays()">
+        Show Grid
+      </label>
+      <label>
+        <input type="checkbox" id="togglePath" checked onchange="toggleOverlays()">
+        Show Path
+      </label>
+      <span id="canvasInfo"></span>
+    </div>
+
+    <div class="canvas-wrap">
+      <div class="canvas-placeholder" id="canvasPlaceholder">
+        <div class="icon">&#x1F5FA;</div>
+        <p>Upload a blueprint to begin</p>
+        <small>Supports JPG, PNG, and most image formats</small>
+      </div>
+      <div class="canvas-inner" id="canvasInner">
+        <canvas id="blueprintCanvas"></canvas>
+        <!-- Server-generated overlays -->
+        <img id="gridOverlay" class="overlay-img hidden" src="/grid.png?t=0">
+        <img id="pathOverlay" class="overlay-img hidden" src="/path.png?t=0">
+      </div>
+      <div class="spinner-overlay" id="uploadSpinner">
+        <div class="spinner"></div>
+        <p class="spinner-text">Running OCR&hellip;</p>
+        <p class="spinner-sub">This takes 30&ndash;60 seconds</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT: Controls & Status ────────────────────────────────────── -->
+  <div class="panel">
+
+    <div class="panel-section">
+      <h2>Status</h2>
+      <div class="status-grid">
+        <div class="stat-card">
+          <div class="stat-label">Parse</div>
+          <div class="stat-val" id="statParse">&mdash;</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Rooms</div>
+          <div class="stat-val" id="statRooms">&mdash;</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Row</div>
+          <div class="stat-val" id="statRow">&mdash;</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Col</div>
+          <div class="stat-val" id="statCol">&mdash;</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Heading</div>
+          <div class="stat-val" id="statHeading">&mdash;</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Cmds left</div>
+          <div class="stat-val" id="statQueue">&mdash;</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Command Queue</h2>
+      <div class="cmd-list" id="cmdList">
+        <span class="cmd-empty">No commands</span>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Voice Control</h2>
+      <button class="btn-voice" id="voiceBtn" onclick="startVoice()">
+        &#x1F3A4; Say destination
+      </button>
+      <p id="voiceStatus" class="field-hint" style="min-height:1rem;margin-top:2px"></p>
+    </div>
+
+    <div class="panel-section">
+      <h2>Manual Controls</h2>
+      <div class="dpad">
+        <div></div>
+        <button class="btn-secondary" onclick="manualMove('F')">&#x2191;</button>
+        <div></div>
+        <button class="btn-secondary" onclick="manualMove('L')">&#x2190;</button>
+        <button class="btn-danger"    onclick="manualMove('S')" style="font-size:0.75rem;padding:14px 6px">STOP</button>
+        <button class="btn-secondary" onclick="manualMove('R')">&#x2192;</button>
+        <div></div>
+        <button class="btn-secondary" onclick="manualMove('B')">&#x2193;</button>
+        <div></div>
+      </div>
+    </div>
+
+    <div class="panel-section" style="flex:1;min-height:0">
+      <h2>Log</h2>
+      <div class="log" id="logBox"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = ""; // relative paths - works with both localhost:5000 and 127.0.0.1:5000, fixes CORS origin mismatch
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let blueprintImg  = null;
+let wallGrid      = null;
+let parsedRooms   = [];
+let robotPose     = { row: 0, col: 0, heading: 0 };
+let poseSet       = false;
+let selectedRoom  = null;
+let fullCmdList        = [];
+let currentPath        = [];
+let navGoal            = null;
+let detectedOrientation = null;
+let cellSizePx      = 10;
+let realCmPerCell   = 10.0;
+let robotWidthCm    = 60.0;
+let robotLengthCm   = 90.0;
+let lastPoseKey     = "";
+let pollIntervalMs  = 3000;
+let _pollId         = null;
+let freeMaskImg     = null;
+
+// ── LOGGING ───────────────────────────────────────────────────────────────
+function log(msg, type = "info") {
+  const box = document.getElementById("logBox");
+  const el  = document.createElement("div");
+  el.className   = `log-${type}`;
+  el.textContent = `${new Date().toLocaleTimeString()} ${msg}`;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── UPLOAD ────────────────────────────────────────────────────────────────
+async function uploadBlueprint() {
+  const file = document.getElementById("blueprintFile").files[0];
+  if (!file) { log("No file selected", "err"); return; }
+
+  const btn = document.getElementById("uploadBtn");
+  btn.disabled    = true;
+  btn.textContent = "Parsing...";
+  setBadge("parseBadge", "Parsing...", "active");
+  showSpinner(true);
+  log("Upload started — OCR running...");
+
+  currentPath = [];
+  navGoal     = null;
+  fullCmdList = [];
+
+  const unit         = document.getElementById("unitSelect").value;
+  const robotWidth   = document.getElementById("robotWidth").value;
+  const robotLength  = document.getElementById("robotLength").value;
+  const safetyMargin = document.getElementById("safetyMargin").value;
+
+  const fd = new FormData();
+  fd.append("blueprint", file);
+  fd.append("unit", unit);
+  fd.append("robot_width", robotWidth);
+  fd.append("robot_length", robotLength);
+  fd.append("safety_margin", safetyMargin);
+
+  try {
+    const res  = await fetch(`${API}/upload`, { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    parsedRooms         = data.rooms || [];
+    detectedOrientation = data.orientation?.direction || null;
+    cellSizePx          = data.cell_size_px    || 10;
+    realCmPerCell       = data.real_cm_per_cell || 10.0;
+    robotWidthCm        = data.robot_width_cm  || parseFloat(robotWidth);
+    robotLengthCm       = data.robot_length_cm || parseFloat(robotLength);
+
+    if (data.scale_cm_per_pixel) {
+      log(`Scale auto-detected: ${data.scale_cm_per_pixel.toFixed(4)} cm/px`, "ok");
+    } else {
+      log("Scale not detected from rooms — using default grid size", "info");
+    }
+    if (data.narrow_passages && data.narrow_passages.length > 0) {
+      log(`${data.narrow_passages.length} narrow passage(s) detected — robot may not fit`, "err");
+    }
+
+    renderRoomButtons(parsedRooms);
+
+    const status = data.parse_status;
+    const cmPerCell = realCmPerCell.toFixed(1);
+    const inflation = data.inflation_cells ?? "—";
+
+    if (status === "COMPLETE") {
+      setBadge("parseBadge", "COMPLETE", "ok");
+      log(`Parse complete — ${parsedRooms.length} rooms, ` +
+          `grid ${data.grid_size?.cols}x${data.grid_size?.rows}, ` +
+          `${cmPerCell} cm/cell, inflation ${inflation} cells`, "ok");
+      showToast(`Blueprint parsed — ${parsedRooms.length} rooms detected`);
+    } else {
+      setBadge("parseBadge", "INCOMPLETE", "warn");
+      log(`Parse incomplete: ${data.missing_fields?.join(", ") || "unknown"} — ` +
+          `${cmPerCell} cm/cell`, "err");
+      showToast(`Parsed with missing fields — check log`);
+    }
+
+    document.getElementById("statParse").textContent = status || "—";
+    document.getElementById("statRooms").textContent = parsedRooms.length;
+
+    loadImageToCanvas(file);
+
+  } catch (e) {
+    setBadge("parseBadge", "Error", "warn");
+    log(`Upload failed: ${e.message}`, "err");
+    showSpinner(false);
+    btn.disabled    = false;
+    btn.innerHTML   = '&#x1F4E4; Upload &amp; Parse';
+  }
+}
+
+function loadImageToCanvas(file) {
+  const img = new Image();
+  img.onload = () => {
+    blueprintImg = img;
+
+    const canvas = document.getElementById("blueprintCanvas");
+    canvas.width  = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.style.display = "block";
+    syncOverlaySizes(canvas);
+    document.getElementById("canvasPlaceholder").style.display = "none";
+
+    document.getElementById("canvasInfo").textContent =
+      `${img.naturalWidth}x${img.naturalHeight}px`;
+
+    syncOverlaySizes(canvas);
+    redrawCanvas();
+    loadOverlays();
+    showSpinner(false);
+
+    const btn     = document.getElementById("uploadBtn");
+    btn.disabled  = false;
+    btn.innerHTML = '&#x1F4E4; Upload &amp; Parse';
+  };
+  img.onerror = () => { log("Image load failed", "err"); showSpinner(false); };
+  img.src = URL.createObjectURL(file);
+}
+
+function syncOverlaySizes(canvas) {
+  if (!canvas.width || !canvas.height) return;
+  const wrap  = document.querySelector('.canvas-wrap');
+  const inner = document.getElementById('canvasInner');
+  const scale = Math.min(wrap.clientWidth / canvas.width, wrap.clientHeight / canvas.height);
+  inner.style.width  = Math.round(canvas.width  * scale) + 'px';
+  inner.style.height = Math.round(canvas.height * scale) + 'px';
+}
+
+function loadOverlays() {
+  const canvas = document.getElementById("blueprintCanvas");
+  const gridEl = document.getElementById("gridOverlay");
+  const pathEl = document.getElementById("pathOverlay");
+  const t = Date.now();
+  gridEl.src = `/grid.png?t=${t}`;
+  pathEl.src = `/path.png?t=${t}`;
+
+  // Load free-space mask for robot-width canvas path clipping
+  const fm = new Image();
+  fm.crossOrigin = 'anonymous';
+  fm.onload  = () => { freeMaskImg = fm; redrawCanvas(); };
+  fm.onerror = () => { freeMaskImg = null; };
+  fm.src = `/free-mask.png?t=${t}`;
+
+  syncOverlaySizes(canvas);
+  toggleOverlays();
+}
+
+function loadPathOverlay() {
+  document.getElementById("pathOverlay").src = `/path.png?t=${Date.now()}`;
+  toggleOverlays();
+}
+
+function toggleOverlays() {
+  const canvas = document.getElementById("blueprintCanvas");
+  syncOverlaySizes(canvas);
+  
+  const showGrid = document.getElementById("toggleGrid").checked;
+  const showPath = document.getElementById("togglePath").checked;
+  
+  document.getElementById("gridOverlay").classList.toggle("hidden", !showGrid);
+  document.getElementById("pathOverlay").classList.toggle("hidden", !showPath);
+  
+  document.getElementById("gridOverlay").classList.toggle("active", showGrid);
+  document.getElementById("pathOverlay").classList.toggle("active", showPath);
+}
+
+// ── CANVAS REDRAW ─────────────────────────────────────────────────────────
+function redrawCanvas() {
+  if (!blueprintImg) return;
+  const canvas = document.getElementById("blueprintCanvas");
+  const ctx    = canvas.getContext("2d");
+  const CS     = cellSizePx;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(blueprintImg, 0, 0);
+
+  // Draw robot-width path corridor, clipped to free space
+  if (currentPath && currentPath.length > 1) {
+    const robotWidthPx = Math.max(4, (robotWidthCm / realCmPerCell) * CS);
+
+    // Build the polyline helper (used in both branches)
+    function tracePath(c) {
+      c.beginPath();
+      currentPath.forEach((pt, i) => {
+        const x = pt.col * CS + CS / 2;
+        const y = pt.row * CS + CS / 2;
+        if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+      });
+    }
+
+    if (freeMaskImg) {
+      // Off-screen canvas: use source-in compositing so the stroke is
+      // clipped to only the opaque (free-cell) regions of the mask.
+      const off = document.createElement('canvas');
+      off.width  = canvas.width;
+      off.height = canvas.height;
+      const oc   = off.getContext('2d');
+
+      // Step 1 — draw free-space mask (opaque=free, transparent=obstacle)
+      oc.drawImage(freeMaskImg, 0, 0, canvas.width, canvas.height);
+
+      // Step 2 — new strokes only paint over opaque (free) pixels
+      oc.globalCompositeOperation = 'source-in';
+      oc.strokeStyle = 'rgba(37,99,235,0.70)';
+      oc.lineWidth   = robotWidthPx;
+      oc.lineJoin    = 'round';
+      oc.lineCap     = 'round';
+      tracePath(oc);
+      oc.stroke();
+
+      // Step 3 — dashed centerline for clarity (also clipped by mask)
+      oc.strokeStyle = 'rgba(255,255,255,0.55)';
+      oc.lineWidth   = Math.max(1, CS / 5);
+      oc.setLineDash([CS * 1.5, CS]);
+      tracePath(oc);
+      oc.stroke();
+      oc.setLineDash([]);
+
+      // Step 4 — composite masked path onto main canvas
+      ctx.drawImage(off, 0, 0);
+    } else {
+      // Fallback until mask loads: thin centerline
+      ctx.save();
+      ctx.strokeStyle = 'rgba(37,99,235,0.75)';
+      ctx.lineWidth   = Math.max(2, CS / 3);
+      ctx.lineJoin    = 'round';
+      ctx.lineCap     = 'round';
+      tracePath(ctx);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Goal marker
+  if (navGoal) {
+    const gx = navGoal.col * CS + CS / 2;
+    const gy = navGoal.row * CS + CS / 2;
+    const gr = Math.max(5, CS * 0.55);
+    ctx.save();
+    ctx.shadowColor = 'rgba(220,38,38,0.45)';
+    ctx.shadowBlur  = 8;
+    ctx.fillStyle   = 'rgba(220,38,38,0.88)';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    ctx.arc(gx, gy, gr, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Robot (always on top)
+  if (poseSet) drawRobot(ctx, CS);
+
+  if (detectedOrientation) drawNorthArrow(ctx, canvas.width, canvas.height);
+}
+
+
+
+function drawRobot(ctx, cs) {
+  const x = robotPose.col * cs + cs / 2;
+  const y = robotPose.row * cs + cs / 2;
+
+  // Robot dimensions in pixels (clamped to at least 8px so it's always visible)
+  const wPx = Math.max(8, (robotWidthCm  / realCmPerCell) * cs);
+  const lPx = Math.max(8, (robotLengthCm / realCmPerCell) * cs);
+
+  // heading is degrees CW from North; canvas rotate() is CW-positive with y-down
+  // heading=0(N)→0, heading=90(E)→π/2, heading=270(W)→3π/2
+  const rot = (robotPose.heading * Math.PI) / 180;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+
+  // Glow
+  ctx.beginPath();
+  ctx.roundRect(-wPx / 2 - 4, -lPx / 2 - 4, wPx + 8, lPx + 8, 6);
+  ctx.fillStyle = "rgba(22,163,74,0.18)";
+  ctx.fill();
+
+  // Body rectangle
+  ctx.beginPath();
+  ctx.roundRect(-wPx / 2, -lPx / 2, wPx, lPx, 4);
+  ctx.fillStyle   = "#16a34a";
+  ctx.fill();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth   = 2;
+  ctx.stroke();
+
+  // Front indicator (small triangle pointing forward = up before rotation)
+  ctx.beginPath();
+  ctx.moveTo(0, -lPx / 2 + 2);
+  ctx.lineTo(-wPx / 4, -lPx / 2 + Math.min(wPx / 2, lPx / 3));
+  ctx.lineTo( wPx / 4, -lPx / 2 + Math.min(wPx / 2, lPx / 3));
+  ctx.closePath();
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ── CLICK → SET POSE ──────────────────────────────────────────────────────
+document.getElementById("blueprintCanvas").addEventListener("click", async function(e) {
+  if (!blueprintImg) return;
+  
+  const canvas = e.currentTarget;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const px = (e.clientX - rect.left) * scaleX;
+  const py = (e.clientY - rect.top) * scaleY;
+  const col = Math.floor(px / cellSizePx);
+  const row = Math.floor(py / cellSizePx);
+  const heading = parseInt(document.getElementById("headingSelect").value, 10);
+
+  // Visual feedback
+  const ctx = canvas.getContext("2d");
+  const cs = cellSizePx;
+  const cx = col * cs + cs / 2;
+  const cy = row * cs + cs / 2;
+  ctx.strokeStyle = "#ffaa00";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 10);
+  ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + 10, cy);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Validate
+  try {
+    const freeRes = await fetch(API + '/is-free?row=' + row + '&col=' + col);
+    const freeData = await freeRes.json();
+    
+    if (!freeData.free) {
+      showToast('Cannot place robot here: ' + (freeData.reason || 'obstacle'));
+      setTimeout(redrawCanvas, 100);
+      return;
+    }
+  } catch (e) {
+    log('Validation failed: ' + e.message, 'err');
+    showToast('Position check failed');
+    setTimeout(redrawCanvas, 100);
+    return;
+  }
+
+  // Set pose
+  robotPose = { row, col, heading };
+  poseSet = true;
+
+  try {
+    const res = await fetch(API + '/set-pose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ row, col, heading })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      log('Pose set: row ' + data.pose.row + ', col ' + data.pose.col + ', heading ' + heading + (data.snapped ? ' (auto-snapped)' : ''), 'ok');
+      updateStatusPanel();
+      redrawCanvas();
+      loadPathOverlay();
+    } else {
+      log('Set pose failed: ' + data.error, 'err');
+      showToast(data.error);
+    }
+  } catch (e) {
+    log('Set pose failed: ' + e.message, 'err');
+    showToast('Set pose failed');
+  }
+
+  setTimeout(function() {
+    if (poseSet) redrawCanvas();
+  }, 200);
+});
+
+// ── ROOM BUTTONS ──────────────────────────────────────────────────────────
+function renderRoomButtons(rooms) {
+  const container = document.getElementById("roomButtons");
+  container.innerHTML = "";
+
+  const visible = rooms.filter(r => r.name.toUpperCase() !== "CORRIDOR");
+  if (!visible.length) {
+    container.innerHTML = '<p class="field-hint" style="padding:8px 0">No rooms detected</p>';
+    return;
+  }
+
+  visible.forEach(room => {
+    const btn = document.createElement("button");
+    btn.className    = "room-btn";
+    btn.dataset.room = room.name;
+
+    const dimLabel = room.dimensions
+      ? `<span class="room-dim">${room.dimensions.north_south}x${room.dimensions.east_west}</span>`
+      : "";
+    btn.innerHTML = `&#x1F6AA; ${room.name}${dimLabel}`;
+
+    btn.onclick = () => {
+      setSelectedRoom(room.name);
+      navigateTo(room.name);
+    };
+    container.appendChild(btn);
+  });
+}
+
+function setSelectedRoom(name) {
+  selectedRoom = name;
+  document.querySelectorAll(".room-btn").forEach(btn => {
+    btn.classList.toggle("selected", btn.dataset.room === name);
+  });
+}
+
+// ── NAVIGATE ──────────────────────────────────────────────────────────────
+async function navigateTo(roomName) {
+  if (!poseSet) {
+    log("Click the map to set robot position first", "err");
+    return;
+  }
+  log(`Navigating to ${roomName}...`);
+
+  document.getElementById("cmdList").innerHTML =
+    '<span style="color:var(--accent);font-style:italic">Computing route...</span>';
+
+  try {
+    const res  = await fetch(`${API}/navigate`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ room: roomName }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      log(data.error || `HTTP ${res.status}`, "err");
+      if (data.available_rooms) {
+        log(`Available: ${data.available_rooms.join(", ")}`, "info");
+      }
+      return;
+    }
+
+    fullCmdList = [...(data.commands || [])];
+    renderCommandQueue(fullCmdList, 0);
+
+    const [startRow, startCol] = data.start;
+    const [goalRow,  goalCol]  = data.goal;
+    navGoal     = { row: goalRow, col: goalCol };
+    currentPath = data.path
+      ? data.path.map(p => ({ row: p[0], col: p[1] }))
+      : commandsToPath(startRow, startCol, robotPose.heading, fullCmdList);
+
+    redrawCanvas();
+    loadPathOverlay();
+    updateStatusPanel();
+    if (data.fallback_used === "raw_grid") {
+      log(`Path: ${data.path_cells} cells, ${fullCmdList.length} commands — safety margins removed to find route`, "warn");
+    } else if (data.fallback_used === "opened_doorways") {
+      log(`Path: ${data.path_cells} cells, ${fullCmdList.length} commands — narrow doorway forced open, verify clearance`, "warn");
+    } else {
+      log(`Path: ${data.path_cells} cells, ${fullCmdList.length} commands`, "ok");
+    }
+
+  } catch (e) {
+    log(`Navigate failed: ${e.message}`, "err");
+  }
+}
+
+// ── COMMANDS → PATH WAYPOINTS ─────────────────────────────────────────────
+function commandsToPath(startRow, startCol, heading, commands) {
+  const DEG_DIR = {
+    0:[-1,0], 45:[-1,1], 90:[0,1], 135:[1,1],
+    180:[1,0], 225:[1,-1], 270:[0,-1], 315:[-1,-1]
+  };
+  const SQRT2 = Math.sqrt(2);
+
+  let row = startRow, col = startCol;
+  let dir = ((heading % 360) + 360) % 360;
+  const pts = [{ row, col }];
+
+  for (const cmd of commands) {
+    if (cmd.startsWith("R")) {
+      dir = (dir + parseInt(cmd.slice(1), 10)) % 360;
+    } else if (cmd.startsWith("L")) {
+      dir = ((dir - parseInt(cmd.slice(1), 10)) % 360 + 360) % 360;
+    } else if (cmd.startsWith("F")) {
+      const distCm = parseFloat(cmd.slice(1));
+      const [dr, dc] = DEG_DIR[dir] || [-1, 0];
+      const isDiag = dr !== 0 && dc !== 0;
+      const cmPerStep = realCmPerCell * (isDiag ? SQRT2 : 1.0);
+      const steps = Math.round(distCm / cmPerStep);
+      for (let s = 1; s <= steps; s++) {
+        pts.push({ row: Math.round(row + dr * s), col: Math.round(col + dc * s) });
+      }
+      row += dr * steps;
+      col += dc * steps;
+    }
+  }
+  return pts;
+}
+
+// ── COMMAND QUEUE DISPLAY ─────────────────────────────────────────────────
+function renderCommandQueue(full, consumed) {
+  const box = document.getElementById("cmdList");
+  box.innerHTML = "";
+
+  if (!full.length) {
+    box.innerHTML = '<span class="cmd-empty">No commands</span>';
+    return;
+  }
+
+  full.forEach((cmd, i) => {
+    const div = document.createElement("div");
+    if (i < consumed) {
+      div.className   = "cmd-done";
+      div.textContent = `${i + 1}. ${cmd}`;
+    } else if (i === consumed) {
+      div.className   = "cmd-active";
+      div.textContent = `> ${i + 1}. ${cmd}`;
+    } else {
+      div.className   = "cmd-pending";
+      div.textContent = `${i + 1}. ${cmd}`;
+    }
+    box.appendChild(div);
+  });
+
+  const active = box.querySelector(".cmd-active");
+  if (active) active.scrollIntoView({ block: "nearest" });
+}
+
+// ── STATUS PANEL ──────────────────────────────────────────────────────────
+function updateStatusPanel() {
+  document.getElementById("statRow").textContent     = poseSet ? robotPose.row     : "—";
+  document.getElementById("statCol").textContent     = poseSet ? robotPose.col     : "—";
+  document.getElementById("statHeading").textContent = poseSet ? robotPose.heading : "—";
+  document.getElementById("statQueue").textContent   = fullCmdList.length || "—";
+}
+
+
+// ── POLL /status (real-time pose + dynamic interval) ─────────────────────
+async function pollStatus() {
+  try {
+    const res  = await fetch(`${API}/status`);
+    const data = await res.json();
+
+    setBadge("connectBadge", "Connected", "ok");
+    document.getElementById("statParse").textContent = data.parse_status || "—";
+    if (data.rooms_detected !== undefined)
+      document.getElementById("statRooms").textContent = data.rooms_detected || "—";
+
+    // Sync robot pose from server — redraws canvas when position changes
+    if (data.robot_pose && data.robot_pose.row != null) {
+      const sp  = data.robot_pose;
+      const key = `${sp.row},${sp.col},${sp.heading}`;
+      if (key !== lastPoseKey) {
+        robotPose  = { row: sp.row, col: sp.col, heading: sp.heading };
+        poseSet    = true;
+        lastPoseKey = key;
+        updateStatusPanel();
+        redrawCanvas();
+      }
+    }
+
+    if (fullCmdList.length > 0 && Array.isArray(data.command_queue)) {
+      const consumed = Math.max(0, fullCmdList.length - data.command_queue.length);
+      document.getElementById("statQueue").textContent = data.command_queue.length;
+      renderCommandQueue(fullCmdList, consumed);
+
+      // Poll faster while commands are actively executing
+      const desired = data.command_queue.length > 0 ? 1000 : 3000;
+      if (desired !== pollIntervalMs) {
+        pollIntervalMs = desired;
+        clearInterval(_pollId);
+        _pollId = setInterval(pollStatus, pollIntervalMs);
+      }
+    }
+
+  } catch {
+    setBadge("connectBadge", "Disconnected", "warn");
+  }
+}
+
+// ── RESET ─────────────────────────────────────────────────────────────────
+function resetAll() {
+  blueprintImg = null;
+  parsedRooms  = [];
+  robotPose    = { row: 0, col: 0, heading: 0 };
+  poseSet      = false;
+  selectedRoom = null;
+  fullCmdList  = [];
+  currentPath  = [];
+  navGoal      = null;
+  detectedOrientation = null;
+  cellSizePx  = 10;
+  realCmPerCell = 10.0;
+  robotWidthCm  = 60.0;
+  robotLengthCm = 90.0;
+  lastPoseKey   = "";
+  freeMaskImg   = null;
+  pollIntervalMs = 3000;
+  clearInterval(_pollId);
+  _pollId = setInterval(pollStatus, pollIntervalMs);
+
+  const canvas = document.getElementById("blueprintCanvas");
+  canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  canvas.style.display = "none";
+  document.getElementById("canvasPlaceholder").style.display = "";
+  document.getElementById("canvasInfo").textContent = "";
+
+  // Hide overlays
+  document.getElementById("gridOverlay").classList.add("hidden");
+  document.getElementById("pathOverlay").classList.add("hidden");
+
+  setBadge("parseBadge", "No blueprint", "");
+  document.getElementById("roomButtons").innerHTML =
+    '<p class="field-hint" style="padding:8px 0">Upload a blueprint to see rooms</p>';
+  document.getElementById("cmdList").innerHTML =
+    '<span class="cmd-empty">No commands</span>';
+  document.getElementById("blueprintFile").value = "";
+
+  ["statRow","statCol","statHeading","statParse","statQueue","statRooms"]
+    .forEach(id => document.getElementById(id).textContent = "—");
+
+  const btn     = document.getElementById("uploadBtn");
+  btn.disabled  = false;
+  btn.innerHTML = '&#x1F4E4; Upload &amp; Parse';
+
+  log("Reset complete — ready for new blueprint");
+}
+
+// ── MANUAL CONTROLS ───────────────────────────────────────────────────────
+async function manualMove(dir) {
+  const labels = { F:"Forward 50cm", B:"Backward 50cm", L:"Left 90°", R:"Right 90°", S:"STOP" };
+  if (!poseSet && dir !== "S") { log("Set robot position first", "err"); return; }
+  log(`Manual: ${labels[dir] || dir}`);
+  try {
+    const res  = await fetch(`${API}/manual-move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dir }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (dir === "S") {
+        // STOP: clear the queue display immediately
+        fullCmdList = [];
+        renderCommandQueue([], 0);
+        log("Queue cleared — stopped", "ok");
+      } else if (data.queued) {
+        // Queued via Firebase — pose updates only after execution-done signal
+        fullCmdList = [data.command];
+        renderCommandQueue(fullCmdList, 0);
+        log(`Queued → ${data.command} (awaiting execution)`, "ok");
+        if (data.warning) {
+          log(data.warning, "err");
+          showToast(data.warning);
+          if (data.obstacle_cell) flashObstacle(data.obstacle_cell[0], data.obstacle_cell[1]);
+        }
+      } else {
+        // Firebase disabled fallback: apply pose immediately
+        robotPose   = data.pose;
+        poseSet     = true;
+        lastPoseKey = `${data.pose.row},${data.pose.col},${data.pose.heading}`;
+        updateStatusPanel();
+        redrawCanvas();
+        if (data.warning) {
+          log(data.warning, "err");
+          showToast(data.warning);
+          if (data.obstacle_cell) flashObstacle(data.obstacle_cell[0], data.obstacle_cell[1]);
+        }
+      }
+    } else {
+      log(data.error || "Move blocked", "err");
+      showToast(data.error || "Move blocked by obstacle");
+      if (data.obstacle_cell) flashObstacle(data.obstacle_cell[0], data.obstacle_cell[1]);
+    }
+  } catch (e) {
+    log(`Manual move error: ${e.message}`, "err");
+  }
+}
+
+// Flash a cell red briefly to show where the obstacle is
+function flashObstacle(row, col) {
+  if (!blueprintImg) return;
+  const canvas = document.getElementById("blueprintCanvas");
+  const ctx    = canvas.getContext("2d");
+  const cs     = cellSizePx;
+  ctx.fillStyle = "rgba(220, 38, 38, 0.75)";
+  ctx.fillRect(col * cs, row * cs, cs, cs);
+  setTimeout(redrawCanvas, 900);
+}
+
+// ── VOICE ─────────────────────────────────────────────────────────────────
+function startVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { log("Speech recognition not supported", "err"); return; }
+
+  const recog = new SR();
+  recog.lang          = "en-US";
+  recog.interimResults = false;
+
+  const btn = document.getElementById("voiceBtn");
+  btn.classList.add("listening");
+  btn.innerHTML = '&#x1F534; Listening...';
+  document.getElementById("voiceStatus").textContent = "Speak now...";
+
+  recog.onresult = ({ results }) => {
+    const transcript = results[0][0].transcript.toLowerCase();
+    log(`Voice: "${transcript}"`);
+    document.getElementById("voiceStatus").textContent = `Heard: "${transcript}"`;
+
+    const match = parsedRooms.find(r =>
+      transcript.includes(r.name.toLowerCase()) ||
+      r.name.toLowerCase().includes(transcript)
+    );
+    if (match) {
+      log(`Voice matched: ${match.name}`, "ok");
+      setSelectedRoom(match.name);
+      navigateTo(match.name);
+    } else {
+      log(`No room matched: "${transcript}"`, "err");
+    }
+  };
+
+  recog.onerror = ({ error }) => log(`Voice error: ${error}`, "err");
+
+  recog.onend = () => {
+    btn.classList.remove("listening");
+    btn.innerHTML = '&#x1F3A4; Say destination';
+    document.getElementById("voiceStatus").textContent = "";
+  };
+
+  recog.start();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────
+function showSpinner(on) {
+  document.getElementById("uploadSpinner").classList.toggle("active", on);
+}
+
+function setBadge(id, text, cls) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className   = "badge" + (cls ? ` ${cls}` : "");
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ── NORTH ARROW ───────────────────────────────────────────────────────────
+function drawNorthArrow(ctx, canvasW, canvasH) {
+  const pad = 14;
+  const r   = 18;
+  const cx  = canvasW - r - pad;
+  const cy  = r + pad;
+
+  const rotMap = { N: 0, E: Math.PI / 2, S: Math.PI, W: -Math.PI / 2 };
+  const rot = rotMap[detectedOrientation] || 0;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, r + 4, 0, 2 * Math.PI);
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fill();
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.rotate(rot);
+
+  ctx.beginPath();
+  ctx.moveTo(0, -(r - 1));
+  ctx.lineTo(5,  4);
+  ctx.lineTo(0,  1);
+  ctx.lineTo(-5, 4);
+  ctx.closePath();
+  ctx.fillStyle = "#dc2626";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(0,  (r - 1));
+  ctx.lineTo(5, -4);
+  ctx.lineTo(0, -1);
+  ctx.lineTo(-5,-4);
+  ctx.closePath();
+  ctx.fillStyle = "#94a3b8";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(0, 0, 2.5, 0, 2 * Math.PI);
+  ctx.fillStyle = "#1e293b";
+  ctx.fill();
+
+  ctx.rotate(-rot);
+
+  ctx.fillStyle    = "#1e293b";
+  ctx.font         = "bold 9px Inter, Arial";
+  ctx.textAlign    = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("N", 0, -(r + 3));
+
+  ctx.restore();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+_pollId = setInterval(pollStatus, pollIntervalMs);
+pollStatus();
+
+// ── RESIZE HANDLER ────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  if (blueprintImg) {
+    const canvas = document.getElementById("blueprintCanvas");
+    syncOverlaySizes(canvas);
+  }
+});
+
+</script>
+</body>
+</html>
