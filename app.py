@@ -795,6 +795,27 @@ def command_done():
 
     return jsonify({"ok": True, "sequence": seq, "pose": state["robot_pose"]})
 
+# ── ROUTE: Firebase debug — read current queue from Firebase ─────────────────
+@app.route("/firebase-debug", methods=["GET"])
+def firebase_debug():
+    if not firebase_queue.enabled:
+        return jsonify({"enabled": False, "error": firebase_queue.error})
+    try:
+        queue = firebase_queue._db.reference(f"/robots/{ROBOT_ID}/queue").get()
+        meta  = firebase_queue._db.reference(f"/robots/{ROBOT_ID}/meta").get()
+        status = firebase_queue._db.reference(f"/robots/{ROBOT_ID}/status").get()
+        return jsonify({
+            "enabled":    True,
+            "robot_id":   ROBOT_ID,
+            "queue":      queue,
+            "meta":       meta,
+            "status":     status,
+            "local_last_synced_seq": state["last_synced_seq"],
+            "local_all_commands":    state.get("all_commands", []),
+        })
+    except Exception as e:
+        return jsonify({"enabled": True, "error": str(e)})
+
 # ── ROUTE: Manual d-pad movement ─────────────────────────────────────────────
 @app.route("/manual-move", methods=["POST"])
 def manual_move():

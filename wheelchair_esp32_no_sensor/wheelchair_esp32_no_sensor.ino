@@ -1,4 +1,5 @@
 #include <WiFi.h>
+#include <WiFiUDP.h>
 #include <AccelStepper.h>
 #include <Firebase_ESP_Client.h>
 
@@ -10,16 +11,6 @@
 #define FIREBASE_API_KEY      "AIzaSyAltzaCaE4QI8FWW0m9ZCW8mPdUer3QVCk"
 #define FIREBASE_DATABASE_URL "https://id-project-b4d10-default-rtdb.asia-southeast1.firebasedatabase.app/"
 #define ROBOT_ID              "wheelchair_01"
-
-// ── ULTRASONIC ───────────────────────────────
-#define TRIG_PIN 18
-#define ECHO_PIN 19
-
-// Set false to disable obstacle detection entirely (useful for testing without sensor)
-#define SENSOR_ENABLED        true
-#define OBSTACLE_THRESHOLD_CM 20.0  // cm — stop when obstacle within 20cm
-#define DIST_INTERVAL_MS      100   // ms between sensor pings (HC-SR04 needs ≥60ms)
-#define BLOCK_CONFIRM_COUNT   2     // consecutive close readings required to trigger BLOCKED
 
 // ── MOTOR PINS ───────────────────────────────
 #define L_IN1 13
@@ -53,29 +44,36 @@ FirebaseConfig config;
 
 // ── STATE ────────────────────────────────────
 bool   motionActive = false;
-bool   blocked      = false;
 
 float         curLeftSpeed  = 0;
 float         curRightSpeed = 0;
 unsigned long motionStart   = 0;
 unsigned long motionTotal   = 0;
-unsigned long motionElapsed = 0;
 
 String activeSeqKey  = "";
 String activeCommand = "";
 
-// Heading degrees CW from North: 0=N, 90=E, 180=S, 270=W
 int headingDeg = 0;
 
 unsigned long lastPollMs = 0;
 
-// ── ULTRASONIC STATE ─────────────────────────
-unsigned long lastDistMs  = 0;
-float         lastDistCm  = 999.0;
-int           nearCount   = 0;
-int           clearCount  = 0;
-
 struct NextCmd { String key; int num; };
+
+// ── UDP LOGGER ───────────────────────────────
+WiFiUDP udpLog;
+#define LOG_PORT 4444
+
+void rlog(const char* fmt, ...) {
+  char buf[256];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  Serial.print(buf);
+  udpLog.beginPacket("255.255.255.255", LOG_PORT);
+  udpLog.print(buf);
+  udpLog.endPacket();
+}
 
 // ── PATH HELPERS ─────────────────────────────
 String queuePath()          { return String("/robots/") + ROBOT_ID + "/queue"; }
@@ -88,6 +86,7 @@ void connectWiFi() {
   Serial.print("WiFi");
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
   Serial.println(" connected: " + WiFi.localIP().toString());
+  udpLog.begin(LOG_PORT);
 }
 
 // ── FIREBASE ─────────────────────────────────
@@ -97,46 +96,8 @@ void connectFirebase() {
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
   if (!Firebase.signUp(&config, &auth, "", "")) {
-    Serial.println("Firebase anon auth failed: " +
-                   String(config.signer.signupError.message.c_str()));
+    rlog("Firebase anon auth failed: %s\n", config.signer.signupError.message.c_str());
   }
-}
-
-// ── ULTRASONIC ───────────────────────────────
-float sampleDistance() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(500);  // let trigger noise settle
-  unsigned long dur = pulseIn(ECHO_PIN, HIGH, 20000);
-  float d = dur * 0.034f / 2.0f;
-  return (d < 2.0f || d > 400.0f) ? 999.0f : d;
-}
-
-bool checkObstacle() {
-#if !SENSOR_ENABLED
-  return false;
-#endif
-  unsigned long now = millis();
-  if (now - motionStart < 200) return false;
-  if (now - lastDistMs < DIST_INTERVAL_MS) {
-    return (nearCount >= BLOCK_CONFIRM_COUNT);
-  }
-  lastDistMs = now;
-  lastDistCm = sampleDistance();
-
-  Serial.printf("   Sensor: %.1f cm\n", lastDistCm);
-  if (lastDistCm < OBSTACLE_THRESHOLD_CM) {
-    nearCount++;
-    clearCount = 0;
-    Serial.printf("   ⚠ near %d/%d\n", nearCount, BLOCK_CONFIRM_COUNT);
-  } else {
-    clearCount++;
-    nearCount = 0;
-  }
-  return (nearCount >= BLOCK_CONFIRM_COUNT);
 }
 
 // ── HEADING TRACKING ─────────────────────────
@@ -147,11 +108,10 @@ void applyTurn(char dir, float degrees) {
 }
 
 // ── FIREBASE STATUS ──────────────────────────
-void updateFirebaseStatus(const char* qs, const char* obs) {
+void updateFirebaseStatus(const char* qs) {
   if (!Firebase.ready()) return;
   FirebaseJson j;
   j.set("queue_status",   qs);
-  j.set("obstacle",       obs);
   j.set("pose/heading",   headingDeg);
   j.set("last_heartbeat", (int)(millis() / 1000));
   Firebase.RTDB.updateNode(&fbdo, statusPath(), &j);
@@ -176,14 +136,10 @@ void startMotion(float leftSpd, float rightSpd, unsigned long durationMs) {
   curLeftSpeed  = leftSpd;
   curRightSpeed = rightSpd;
   motionTotal   = durationMs;
-  motionElapsed = 0;
   motionStart   = millis();
   leftMotor.setSpeed(leftSpd);
   rightMotor.setSpeed(rightSpd);
   motionActive  = true;
-  blocked       = false;
-  nearCount     = 0;
-  clearCount    = 0;
 }
 
 // ── COMMAND EXECUTION ────────────────────────
@@ -196,33 +152,33 @@ void executeCommand(String seqKey, String cmd) {
   activeCommand = cmd;
 
   setItemStatus(seqKey, "IN_PROGRESS");
-  updateFirebaseStatus("IN_PROGRESS", "CLEAR");
-  Serial.printf("▶ %s: %s\n", seqKey.c_str(), cmd.c_str());
+  updateFirebaseStatus("IN_PROGRESS");
+  rlog("▶ %s: %s\n", seqKey.c_str(), cmd.c_str());
 
   unsigned long ms;
 
   if (type == 'F') {
     ms = (unsigned long)(value * MS_PER_CM);
     startMotion(RUN_SPEED, -RUN_SPEED, ms);
-    Serial.printf("   FWD  %.1f cm → %lu ms\n", value, ms);
+    rlog("   FWD  %.1f cm -> %lu ms\n", value, ms);
   }
   else if (type == 'B') {
     ms = (unsigned long)(value * MS_PER_CM);
     startMotion(-RUN_SPEED, RUN_SPEED, ms);
-    Serial.printf("   BWD  %.1f cm → %lu ms\n", value, ms);
+    rlog("   BWD  %.1f cm -> %lu ms\n", value, ms);
   }
   else if (type == 'R') {
     ms = (unsigned long)(value * MS_PER_DEG);
     startMotion(RUN_SPEED, RUN_SPEED, ms);
-    Serial.printf("   RIGHT %.0f deg → %lu ms\n", value, ms);
+    rlog("   RIGHT %.0f deg -> %lu ms\n", value, ms);
   }
   else if (type == 'L') {
     ms = (unsigned long)(value * MS_PER_DEG);
     startMotion(-RUN_SPEED, -RUN_SPEED, ms);
-    Serial.printf("   LEFT  %.0f deg → %lu ms\n", value, ms);
+    rlog("   LEFT  %.0f deg -> %lu ms\n", value, ms);
   }
   else {
-    Serial.printf("   Unknown command: %s\n", cmd.c_str());
+    rlog("   Unknown command: %s\n", cmd.c_str());
   }
 }
 
@@ -269,39 +225,6 @@ void pollQueue() {
 void runMotion() {
   if (!motionActive) return;
 
-  char cmdType = activeCommand.charAt(0);
-
-  if (cmdType == 'F') {
-    bool obs = checkObstacle();
-
-    if (obs && !blocked) {
-      motionElapsed += millis() - motionStart;
-      stopMotors();
-      blocked = true;
-      setItemStatus(activeSeqKey, "BLOCKED");
-      updateFirebaseStatus("BLOCKED", "FRONT");
-      Serial.printf("⛔ BLOCKED (%.1f cm)\n", lastDistCm);
-      return;
-    }
-
-    if (blocked) {
-      if (obs) return;
-
-      unsigned long remaining = (motionElapsed < motionTotal)
-                                ? (motionTotal - motionElapsed) : 0;
-      if (remaining == 0) {
-        stopMotors();
-        motionActive = false;
-        setItemStatus(activeSeqKey, "DONE");
-        updateFirebaseStatus("DONE", "CLEAR");
-        Serial.println("✅ DONE");
-        return;
-      }
-      Serial.printf("✅ RESUMED — %lu ms remaining\n", remaining);
-      startMotion(curLeftSpeed, curRightSpeed, remaining);
-    }
-  }
-
   leftMotor.runSpeed();
   rightMotor.runSpeed();
 
@@ -309,21 +232,20 @@ void runMotion() {
     stopMotors();
     motionActive = false;
 
-    float val = activeCommand.substring(1).toFloat();
+    char  cmdType = activeCommand.charAt(0);
+    float val     = activeCommand.substring(1).toFloat();
     if (cmdType == 'R') applyTurn('R', val);
     if (cmdType == 'L') applyTurn('L', val);
 
     setItemStatus(activeSeqKey, "DONE");
-    updateFirebaseStatus("DONE", "CLEAR");
-    Serial.println("✅ DONE");
+    updateFirebaseStatus("DONE");
+    rlog("DONE\n");
   }
 }
 
 // ── SETUP ────────────────────────────────────
 void setup() {
   Serial.begin(115200);
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
 
   leftMotor.setMaxSpeed(MAX_SPEED);
   rightMotor.setMaxSpeed(MAX_SPEED);
@@ -336,13 +258,11 @@ void setup() {
   while (!Firebase.ready() && millis() - t < 10000) {
     delay(300); Serial.print(".");
   }
-  Serial.println(Firebase.ready() ? " OK" : " FAILED: " + String(fbdo.errorReason().c_str()));
+  rlog(Firebase.ready() ? " OK\n" : " FAILED\n");
 
-  updateFirebaseStatus("IDLE", "CLEAR");
-  Serial.println("wheelchair_01 ready");
-  Serial.printf("   MS_PER_CM=%.2f  MS_PER_DEG=%.2f\n", MS_PER_CM, MS_PER_DEG);
-  Serial.printf("   Sensor: %s  threshold=%.0f cm  confirm=%d readings\n",
-                SENSOR_ENABLED ? "ON" : "OFF", OBSTACLE_THRESHOLD_CM, BLOCK_CONFIRM_COUNT);
+  updateFirebaseStatus("IDLE");
+  rlog("wheelchair_01 ready\n");
+  rlog("   MS_PER_CM=%.2f  MS_PER_DEG=%.2f\n", MS_PER_CM, MS_PER_DEG);
 }
 
 // ── LOOP ─────────────────────────────────────

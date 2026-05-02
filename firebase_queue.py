@@ -77,6 +77,7 @@ class FirebaseQueuePublisher:
         self._db.reference(f"/robots/{robot_id}/meta").set(
             {"active_sequence": 1 if commands else None}
         )
+        print(f"   Firebase: published {len(commands)} command(s) → {list(payload.keys())}")
 
     def cancel_queue(self, robot_id: str) -> None:
         if not self.enabled or self._db is None:
