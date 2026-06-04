@@ -431,6 +431,26 @@ si<!DOCTYPE html>
       border-color: #fca5a5;
       animation: pulse 1s infinite;
     }
+    .blind-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
 
     /* ── SCROLLBARS ──────────────────────────────────────────────────── */
@@ -625,9 +645,13 @@ si<!DOCTYPE html>
 
     <div class="panel-section">
       <h2>Voice Control</h2>
-      <button class="btn-voice" id="voiceBtn" onclick="startVoice()">
+      <button class="btn-voice" id="voiceBtn" onclick="startVoice()" aria-label="Start voice command">
         &#x1F3A4; Say destination
       </button>
+      <label class="blind-toggle">
+        <input type="checkbox" id="blindModeToggle" onchange="setBlindMode(this.checked)">
+        Blind mode audio
+      </label>
       <p id="voiceStatus" class="field-hint" style="min-height:1rem;margin-top:2px"></p>
     </div>
 
@@ -635,13 +659,13 @@ si<!DOCTYPE html>
       <h2>Manual Controls</h2>
       <div class="dpad">
         <div></div>
-        <button class="btn-secondary" onclick="manualMove('F')">&#x2191;</button>
+        <button class="btn-secondary" onclick="manualMove('F')" aria-label="Move forward">&#x2191;</button>
         <div></div>
-        <button class="btn-secondary" onclick="manualMove('L')">&#x2190;</button>
-        <button class="btn-danger"    onclick="manualMove('S')" style="font-size:0.75rem;padding:14px 6px">STOP</button>
-        <button class="btn-secondary" onclick="manualMove('R')">&#x2192;</button>
+        <button class="btn-secondary" onclick="manualMove('L')" aria-label="Turn left">&#x2190;</button>
+        <button class="btn-danger"    onclick="manualMove('S')" aria-label="Stop robot" style="font-size:0.75rem;padding:14px 6px">STOP</button>
+        <button class="btn-secondary" onclick="manualMove('R')" aria-label="Turn right">&#x2192;</button>
         <div></div>
-        <button class="btn-secondary" onclick="manualMove('B')">&#x2193;</button>
+        <button class="btn-secondary" onclick="manualMove('B')" aria-label="Move backward">&#x2193;</button>
         <div></div>
       </div>
     </div>
@@ -656,6 +680,7 @@ si<!DOCTYPE html>
 </div>
 
 <div id="toast"></div>
+<div id="blindLive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
 
 <script>
 const API = ""; // relative paths - works with both localhost:5000 and 127.0.0.1:5000, fixes CORS origin mismatch
@@ -681,6 +706,8 @@ let _pollId         = null;
 let freeMaskImg     = null;
 let rawMaskImg      = null;
 let showPathOnCanvas = true;
+let blindModeEnabled = false;
+let lastAnnouncedSeq = 0;
 
 // ── LOGGING ───────────────────────────────────────────────────────────────
 function log(msg, type = "info") {
@@ -690,6 +717,77 @@ function log(msg, type = "info") {
   el.textContent = `${new Date().toLocaleTimeString()} ${msg}`;
   box.appendChild(el);
   box.scrollTop = box.scrollHeight;
+  announceForBlind(msg, type);
+}
+
+function setBlindMode(enabled) {
+  blindModeEnabled = enabled;
+  const msg = enabled ? "Blind mode audio enabled" : "Blind mode audio disabled";
+  announceForBlind(msg, "info", true);
+  log(msg);
+}
+
+function announceForBlind(msg, type = "info", force = false) {
+  const live = document.getElementById("blindLive");
+  if (live) live.textContent = msg;
+
+  if (!blindModeEnabled && !force) return;
+  if (!window.speechSynthesis) return;
+
+  const important = force || type === "err" || type === "warn" || type === "ok";
+  if (!important) return;
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(msg);
+  utterance.rate = 0.95;
+  window.speechSynthesis.speak(utterance);
+}
+
+function roomListText() {
+  const names = parsedRooms
+    .map(r => r.name)
+    .filter(name => name.toUpperCase() !== "CORRIDOR");
+  return names.length ? names.join(", ") : "No rooms detected yet";
+}
+
+function findRoomFromText(text) {
+  const cleaned = text.trim().toLowerCase();
+  return parsedRooms.find(r => {
+    const name = r.name.toLowerCase();
+    return cleaned.includes(name) || name.includes(cleaned);
+  });
+}
+
+async function setPoseFromRoom(roomName) {
+  const heading = parseInt(document.getElementById("headingSelect").value, 10);
+  log(`Setting start at ${roomName}...`);
+
+  try {
+    const res = await fetch(`${API}/set-pose-room`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: roomName, heading }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      log(data.error || `HTTP ${res.status}`, "err");
+      if (data.available_rooms) log(`Available: ${data.available_rooms.join(", ")}`, "info");
+      return false;
+    }
+
+    robotPose = data.pose;
+    poseSet = true;
+    lastPoseKey = `${data.pose.row},${data.pose.col},${data.pose.heading}`;
+    updateStatusPanel();
+    redrawCanvas();
+    loadPathOverlay();
+    log(`Start set at ${data.room}, row ${data.pose.row}, col ${data.pose.col}${data.snapped ? " (auto-snapped)" : ""}`, "ok");
+    return true;
+  } catch (e) {
+    log(`Set start failed: ${e.message}`, "err");
+    return false;
+  }
 }
 
 // ── UPLOAD ────────────────────────────────────────────────────────────────
@@ -743,6 +841,7 @@ async function uploadBlueprint() {
     }
 
     renderRoomButtons(parsedRooms);
+    if (blindModeEnabled) log(`Available rooms: ${roomListText()}`, "ok");
 
     const status = data.parse_status;
     const cmPerCell = realCmPerCell.toFixed(1);
@@ -1096,6 +1195,7 @@ function renderRoomButtons(rooms) {
     const btn = document.createElement("button");
     btn.className    = "room-btn";
     btn.dataset.room = room.name;
+    btn.setAttribute("aria-label", `Navigate to ${room.name}`);
 
     const dimLabel = room.dimensions
       ? `<span class="room-dim">${room.dimensions.north_south}x${room.dimensions.east_west}</span>`
@@ -1120,7 +1220,7 @@ function setSelectedRoom(name) {
 // ── NAVIGATE ──────────────────────────────────────────────────────────────
 async function navigateTo(roomName) {
   if (!poseSet) {
-    log("Click the map to set robot position first", "err");
+    log("Set robot start first. In blind mode, say set start at followed by a room name.", "err");
     return;
   }
   log(`Navigating to ${roomName}...`);
@@ -1145,6 +1245,7 @@ async function navigateTo(roomName) {
     }
 
     fullCmdList = [...(data.commands || [])];
+    lastAnnouncedSeq = 0;
     renderCommandQueue(fullCmdList, 0);
 
     const [startRow, startCol] = data.start;
@@ -1268,6 +1369,17 @@ async function pollStatus() {
       const consumed = data.last_synced_seq || 0;
       document.getElementById("statQueue").textContent = Math.max(0, fullCmdList.length - consumed);
       renderCommandQueue(fullCmdList, consumed);
+      if (blindModeEnabled && consumed !== lastAnnouncedSeq) {
+        lastAnnouncedSeq = consumed;
+        const remainingNow = Math.max(0, fullCmdList.length - consumed);
+        announceForBlind(
+          remainingNow > 0
+            ? `Command ${consumed} completed. ${remainingNow} commands remaining.`
+            : "Route completed.",
+          "ok",
+          true
+        );
+      }
 
       // Poll faster while commands are actively executing
       const remaining = fullCmdList.length - consumed;
@@ -1398,6 +1510,68 @@ function flashObstacle(row, col) {
 }
 
 // ── VOICE ─────────────────────────────────────────────────────────────────
+async function handleVoiceCommand(transcript) {
+  if (transcript.includes("list rooms") || transcript.includes("available rooms")) {
+    log(`Rooms: ${roomListText()}`, "ok");
+    return;
+  }
+
+  if (transcript === "status" || transcript.includes("robot status")) {
+    const queueText = fullCmdList.length ? `${fullCmdList.length} commands loaded` : "no commands queued";
+    const poseText = poseSet
+      ? `robot at row ${robotPose.row}, column ${robotPose.col}, heading ${robotPose.heading}`
+      : "robot start is not set";
+    log(`Status: ${poseText}, ${queueText}`, "ok");
+    return;
+  }
+
+  if (transcript.includes("stop") || transcript.includes("emergency stop")) {
+    await manualMove("S");
+    return;
+  }
+
+  const START_PHRASES = [
+    "set start at", "set start to", "start at", "start from",
+    "robot is at", "i am at", "we are at", "current location is",
+  ];
+  for (const phrase of START_PHRASES) {
+    if (transcript.includes(phrase)) {
+      const roomText = transcript.replace(phrase, "").trim();
+      const match = findRoomFromText(roomText);
+      if (!match) {
+        log(`No start room matched: "${roomText || transcript}"`, "err");
+        log(`Available: ${roomListText()}`, "info");
+        return;
+      }
+      await setPoseFromRoom(match.name);
+      return;
+    }
+  }
+
+  const NAV_PHRASES = [
+    "i need to go to", "i want to go to", "take me to", "bring me to",
+    "navigate to", "drive to", "proceed to", "get me to", "lets go to",
+    "let's go to", "head to", "move to", "go to",
+  ];
+  let cleaned = transcript;
+  for (const phrase of NAV_PHRASES) {
+    if (cleaned.includes(phrase)) {
+      cleaned = cleaned.replace(phrase, "").trim();
+      break;
+    }
+  }
+
+  const match = findRoomFromText(cleaned) || findRoomFromText(transcript);
+  if (match) {
+    log(`Voice matched: ${match.name}`, "ok");
+    setSelectedRoom(match.name);
+    navigateTo(match.name);
+  } else {
+    log(`No room matched: "${transcript}"`, "err");
+    log(`Available: ${roomListText()}`, "info");
+  }
+}
+
 function startVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { log("Speech recognition not supported", "err"); return; }
@@ -1415,28 +1589,7 @@ function startVoice() {
     const transcript = results[0][0].transcript.toLowerCase();
     log(`Voice: "${transcript}"`);
     document.getElementById("voiceStatus").textContent = `Heard: "${transcript}"`;
-
-    const NAV_PHRASES = [
-      'i need to go to', 'i want to go to', 'take me to', 'bring me to',
-      'navigate to', 'drive to', 'proceed to', 'get me to', 'lets go to',
-      "let's go to", 'head to', 'move to', 'go to',
-    ];
-    let cleaned = transcript;
-    for (const p of NAV_PHRASES) {
-      if (cleaned.includes(p)) { cleaned = cleaned.replace(p, '').trim(); break; }
-    }
-    const match = parsedRooms.find(r =>
-      cleaned.includes(r.name.toLowerCase()) ||
-      r.name.toLowerCase().includes(cleaned) ||
-      transcript.includes(r.name.toLowerCase())
-    );
-    if (match) {
-      log(`Voice matched: ${match.name}`, "ok");
-      setSelectedRoom(match.name);
-      navigateTo(match.name);
-    } else {
-      log(`No room matched: "${transcript}"`, "err");
-    }
+    handleVoiceCommand(transcript);
   };
 
   recog.onerror = ({ error }) => log(`Voice error: ${error}`, "err");

@@ -335,6 +335,80 @@ def set_pose():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 # ── ROUTE 4: Navigate to a room ───────────────────────────────────────────
+@app.route("/set-pose-room", methods=["POST"])
+def set_pose_room():
+    try:
+        if not state["inflated_grid"]:
+            return jsonify({"ok": False, "error": "No blueprint loaded. Call /upload first."}), 400
+
+        data = request.json
+        target_room = data.get("room", "").strip().lower()
+        heading = int(data.get("heading", state["robot_pose"].get("heading", 0))) % 360
+
+        matched = None
+        for room in state["rooms"]:
+            if room["name"].lower() == target_room:
+                matched = room
+                break
+        if not matched:
+            for room in state["rooms"]:
+                room_name = room["name"].lower()
+                if target_room in room_name or room_name in target_room:
+                    matched = room
+                    break
+
+        if not matched:
+            return jsonify({
+                "ok": False,
+                "error": f"Room '{data.get('room', '')}' not found",
+                "available_rooms": [r["name"] for r in state["rooms"]],
+            }), 404
+
+        cell_size = state.get("cell_size_px", 10)
+        rx, ry = matched["center"]
+        row = ry // cell_size
+        col = rx // cell_size
+        grid = state["inflated_grid"]
+        rows = len(grid)
+        cols = len(grid[0]) if rows > 0 else 0
+
+        if not (0 <= row < rows and 0 <= col < cols):
+            return jsonify({"ok": False, "error": "Room center is out of grid bounds"}), 400
+
+        snapped = False
+        if grid[row][col] == 1:
+            found = False
+            for radius in range(1, 21):
+                for dr in range(-radius, radius + 1):
+                    for dc in range(-radius, radius + 1):
+                        nr, nc = row + dr, col + dc
+                        if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 0:
+                            row, col = nr, nc
+                            found = True
+                            snapped = True
+                            break
+                    if found:
+                        break
+                if found:
+                    break
+
+            if not found:
+                return jsonify({"ok": False, "error": "No free cell near that room"}), 400
+
+        state["robot_pose"] = {"row": row, "col": col, "heading": heading}
+
+        try:
+            firebase_queue.publish_status(ROBOT_ID, {
+                "row": row, "col": col, "heading": heading
+            })
+        except Exception as fb_err:
+            print(f"     Firebase pose sync failed: {fb_err}")
+
+        return jsonify({"ok": True, "pose": state["robot_pose"], "room": matched["name"], "snapped": snapped})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/navigate", methods=["POST"])
 def navigate():
     try:
