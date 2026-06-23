@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from blueprint_parser import parse_blueprint, estimate_scale_from_room_positions
 from grid_generator import generate_grid, find_narrow_passages
-from astar import astar, path_to_commands
+from astar import astar, path_to_commands, smooth_path
 from flask import send_file
 from io import BytesIO
 from firebase_queue import firebase_queue
@@ -12,6 +12,12 @@ import numpy as np
 import cv2
 import threading
 import time
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+except ImportError:
+    pass
 
 ROBOT_ID = "wheelchair_01"
 
@@ -539,8 +545,9 @@ def navigate():
                 "blocked_near": list(hint) if hint else None,
             }), 400
 
+        smoothed = smooth_path(path, grid_np)
         commands = path_to_commands(
-            path,
+            smoothed,
             cell_size_cm=10,
             initial_heading=heading,
             real_cm_per_cell=state["real_cm_per_cell"],
@@ -997,6 +1004,156 @@ def manual_move():
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/groq-chat", methods=["POST"])
+def groq_chat():
+    try:
+        import json as _json, math as _math
+        api_key = os.environ.get("GROQ_API_KEY", "")
+        if not api_key:
+            return jsonify({"ok": False, "reason": "no_key"})
+        try:
+            from groq import Groq
+        except ImportError:
+            return jsonify({"ok": False, "reason": "groq_not_installed"})
+
+        data     = request.json or {}
+        question = data.get("question", "").strip()
+        if not question:
+            return jsonify({"ok": False, "reason": "no_question"})
+
+        rooms    = state.get("rooms", [])
+        pose     = state.get("robot_pose", {})
+        real_cm  = state.get("real_cm_per_cell", 10.0)
+        cell_px  = state.get("cell_size_px", 10)
+        all_cmds = state.get("all_commands", [])
+
+        room_lines = []
+        for r in rooms:
+            name   = r["name"]
+            cx, cy = r["center"]
+            row    = cy // cell_px
+            col    = cx // cell_px
+            if pose and "row" in pose:
+                dist_cells = _math.sqrt((row - pose["row"]) ** 2 + (col - pose["col"]) ** 2)
+                dist_m     = round(dist_cells * real_cm / 100, 1)
+                room_lines.append(f"- {name}: approximately {dist_m} metres away")
+            else:
+                room_lines.append(f"- {name}")
+
+        rooms_str  = "\n".join(room_lines) if room_lines else "No rooms detected yet."
+        nav_note   = (f"The person is currently following a {len(all_cmds)}-step route."
+                      if all_cmds else "No active route right now.")
+        pose_note  = (f"Current position: row {pose.get('row')}, col {pose.get('col')}, "
+                      f"facing {pose.get('heading', 0)} degrees."
+                      if pose else "Current position unknown.")
+
+        system_msg = (
+            "You are a helpful indoor navigation assistant for a blind person. "
+            "Answer their questions naturally and concisely in 1–2 sentences. "
+            "Use plain spoken English — no markdown, no bullet points, no jargon. "
+            "If they ask what rooms or locations are available, list them clearly by name. "
+            "If they ask how far something is, give the approximate distance in metres. "
+            "If you cannot answer from the context, say so briefly."
+        )
+        user_msg = (
+            f"Building context:\n{rooms_str}\n\n"
+            f"{pose_note}\n{nav_note}\n\n"
+            f"User asked: {question}"
+        )
+
+        client = Groq(api_key=api_key)
+        resp   = client.chat.completions.create(
+            model    = "llama-3.3-70b-versatile",
+            messages = [
+                {"role": "system", "content": system_msg},
+                {"role": "user",   "content": user_msg},
+            ],
+            temperature = 0.3,
+            max_tokens  = 180,
+        )
+        answer = resp.choices[0].message.content.strip()
+        return jsonify({"ok": True, "answer": answer})
+    except Exception as e:
+        return jsonify({"ok": False, "reason": str(e)})
+
+
+@app.route("/groq-labels", methods=["POST"])
+def groq_labels():
+    try:
+        import json as _json
+        api_key = os.environ.get("GROQ_API_KEY", "")
+        if not api_key:
+            return jsonify({"ok": False, "reason": "no_key"})
+        try:
+            from groq import Groq
+        except ImportError:
+            return jsonify({"ok": False, "reason": "groq_not_installed"})
+
+        data          = request.json or {}
+        commands      = data.get("commands", [])
+        target        = data.get("target", "your destination")
+        step_size_cm  = float(data.get("step_size_cm", 75))
+        if not commands:
+            return jsonify({"ok": False, "reason": "no_commands"})
+
+        import math as _math
+
+        def _steps(cm_str):
+            try:
+                return max(1, round(float(cm_str) / step_size_cm))
+            except Exception:
+                return 1
+
+        cmd_descriptions = []
+        for cmd in commands:
+            if cmd.startswith('F'):
+                n = _steps(cmd[1:])
+                cmd_descriptions.append(f"{cmd} → walk forward {n} step{'s' if n!=1 else ''}")
+            elif cmd.startswith('B'):
+                n = _steps(cmd[1:])
+                cmd_descriptions.append(f"{cmd} → step back {n} step{'s' if n!=1 else ''}")
+            elif cmd.startswith('R') or cmd.startswith('L'):
+                deg = int(cmd[1:])
+                d   = "right" if cmd[0]=='R' else "left"
+                if   deg >= 160: label = "turn around"
+                elif deg >= 110: label = f"turn sharply {d}"
+                elif deg >= 70:  label = f"turn {d}"
+                else:            label = f"turn slightly {d}"
+                cmd_descriptions.append(f"{cmd} → {label}")
+            else:
+                cmd_descriptions.append(cmd)
+
+        client = Groq(api_key=api_key)
+        prompt = (
+            f"Guide a blind person walking to {target}.\n"
+            f"Each person step is {step_size_cm} cm.\n\n"
+            f"Commands with suggested labels:\n"
+            + "\n".join(cmd_descriptions) + "\n\n"
+            "Rules:\n"
+            "- Keep step counts exactly as given (e.g. 'walk forward 4 steps')\n"
+            "- Use natural spoken English, no technical terms, no cm values\n"
+            "- Turn instructions: 'turn right', 'turn left', 'turn around', 'turn slightly right'\n"
+            "- Replace the LAST command with 'You have arrived'\n\n"
+            "Return ONLY a valid JSON array of strings, one per command. No other text."
+        )
+
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=600,
+        )
+        raw   = resp.choices[0].message.content.strip()
+        start = raw.find('[')
+        end   = raw.rfind(']') + 1
+        if start == -1 or end == 0:
+            return jsonify({"ok": False, "reason": "parse_failed"})
+        labels = _json.loads(raw[start:end])
+        return jsonify({"ok": True, "labels": labels})
+    except Exception as e:
+        return jsonify({"ok": False, "reason": str(e)})
 
 
 if __name__ == "__main__":

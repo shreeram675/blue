@@ -1,4 +1,4 @@
-si<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -431,14 +431,255 @@ si<!DOCTYPE html>
       border-color: #fca5a5;
       animation: pulse 1s infinite;
     }
-    .blind-toggle {
+
+    /* ── BLIND MODE TOGGLE ───────────────────────────────────────────── */
+    .blind-mode-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .blind-mode-row:hover { border-color: var(--border2); background: #f1f5f9; }
+    .blind-mode-row.active {
+      background: #eff6ff;
+      border-color: var(--accent);
+    }
+    .blind-mode-label {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-top: 8px;
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+    }
+    .blind-mode-label .bm-icon { font-size: 1rem; }
+    .blind-mode-label .bm-sub {
+      font-size: 0.72rem;
+      font-weight: 400;
       color: var(--text-muted);
+      display: block;
+      margin-top: 1px;
+    }
+    /* Toggle switch track */
+    .toggle-switch {
+      position: relative;
+      flex-shrink: 0;
+      width: 40px;
+      height: 22px;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: #cbd5e1;
+      border-radius: 22px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .toggle-track::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,.25);
+      transition: transform 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-track { background: var(--accent); }
+    .toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); }
+    .toggle-switch input:focus-visible + .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Header blind badge */
+    .badge.blind-on {
+      background: #eff6ff;
+      color: var(--accent);
+      border: 1px solid #bfdbfe;
+    }
+
+    /* Voice section active highlight */
+    .voice-section.blind-active { background: #f0f9ff; border-radius: 8px; padding: 8px; margin: -8px; }
+
+    .blind-toggle { display: none; } /* hide old style — replaced */
+
+    /* ── BLIND MODE FULL UI ──────────────────────────────────────────── */
+    #blindPanel, #blindPanelRight {
+      display: none;
+      position: fixed;
+      top: 56px;
+      bottom: 0;
+      z-index: 40;
+      overflow-y: auto;
+      flex-direction: column;
+      gap: 1.1rem;
+      padding: 1.1rem;
+    }
+    #blindPanel {
+      left: 0;
+      width: 340px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      box-shadow: var(--shadow-md);
+    }
+    #blindPanelRight {
+      right: 0;
+      width: 280px;
+      background: var(--surface2);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--shadow-md);
+    }
+    body.blind-mode #blindPanel      { display: flex; }
+    body.blind-mode #blindPanelRight { display: flex; }
+    body.blind-mode .container > .panel { display: none; }
+    body.blind-mode .map-area {
+      position: fixed;
+      left: 340px;
+      right: 280px;
+      top: 56px;
+      bottom: 0;
+      z-index: 30;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+      visibility: visible;
+    }
+    body.blind-mode .container { visibility: hidden; }
+
+    .blind-h2 {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .blind-stat-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    .blind-stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .blind-stat-big   { font-size: 1.55rem; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .blind-stat-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+    .blind-location {
+      background: var(--green-lt);
+      border: 1.5px solid #86efac;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    /* Blind d-pad */
+    .blind-dpad {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 7px;
+    }
+    .blind-dpad button {
+      padding: 16px;
+      font-size: 1.3rem;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      font-family: inherit;
+      transition: background 0.1s, transform 0.08s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    .blind-dpad button:active:not(:disabled) { transform: scale(0.93); }
+    .bdbtn-move { background: var(--accent); color: #fff; }
+    .bdbtn-move:hover { background: var(--accent-h); }
+    .bdbtn-stop { background: var(--red-lt); color: var(--red); border: 1.5px solid #fca5a5; font-size: 0.72rem !important; padding: 16px 4px !important; }
+    .bdbtn-stop:hover { background: #fecaca; }
+    .bdbtn-turn { background: var(--green-lt); color: var(--green); border: 1.5px solid #86efac; }
+    .bdbtn-turn:hover { background: #bbf7d0; }
+
+    /* Blind voice button */
+    .btn-voice-large {
+      background: var(--accent-lt);
+      color: var(--accent);
+      border: 2px solid #93c5fd;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s;
+    }
+    .btn-voice-large:hover { background: #dbeafe; }
+    .btn-voice-large.listening { background: var(--red-lt); color: var(--red); border-color: #fca5a5; animation: pulse 1s infinite; }
+
+    /* Blind inputs — same as normal inputs */
+    .blind-field { display: flex; flex-direction: column; gap: 4px; }
+    .blind-label { font-size: 0.85rem; font-weight: 600; color: var(--text); display: block; }
+    .blind-input {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .blind-input:hover { border-color: var(--border2); }
+    .blind-input:focus { border-color: var(--accent); }
+    .blind-input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* Blind room buttons — same style as normal .room-btn */
+    .blind-room-btn {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+      transition: background 0.12s, border-color 0.12s;
+      display: block;
+    }
+    .blind-room-btn:hover { background: var(--accent-lt); border-color: #93c5fd; }
+    .blind-room-btn.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Step size row in normal manual controls */
+    .move-config {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
     .sr-only {
       position: absolute;
@@ -505,6 +746,7 @@ si<!DOCTYPE html>
   <h1><span>Blueprint</span> Navigation</h1>
   <span class="badge" id="parseBadge">No blueprint</span>
   <span class="badge" id="connectBadge">Connecting&hellip;</span>
+  <span class="badge" id="blindBadge" style="display:none">&#x1F508; Audio ON</span>
   <button class="btn-danger" onclick="resetAll()"
           style="width:auto;padding:8px 16px;font-size:0.8rem;margin-left:auto">
     &#8635; Reset
@@ -643,20 +885,41 @@ si<!DOCTYPE html>
       </div>
     </div>
 
-    <div class="panel-section">
+    <div class="panel-section voice-section" id="voiceSection">
       <h2>Voice Control</h2>
       <button class="btn-voice" id="voiceBtn" onclick="startVoice()" aria-label="Start voice command">
         &#x1F3A4; Say destination
       </button>
-      <label class="blind-toggle">
-        <input type="checkbox" id="blindModeToggle" onchange="setBlindMode(this.checked)">
-        Blind mode audio
-      </label>
       <p id="voiceStatus" class="field-hint" style="min-height:1rem;margin-top:2px"></p>
+
+      <!-- Blind mode toggle -->
+      <div class="blind-mode-row" id="blindModeRow" onclick="toggleBlindMode()">
+        <label class="blind-mode-label">
+          <span class="bm-icon">&#x1F508;</span>
+          <span>
+            Blind Mode Audio
+            <span class="bm-sub">Speak navigation events aloud</span>
+          </span>
+        </label>
+        <div class="toggle-switch">
+          <input type="checkbox" id="blindModeToggle" onchange="setBlindMode(this.checked)" onclick="event.stopPropagation()">
+          <div class="toggle-track"></div>
+        </div>
+      </div>
     </div>
 
     <div class="panel-section">
       <h2>Manual Controls</h2>
+      <div class="move-config">
+        <div>
+          <label>Step (cm)</label>
+          <input type="number" id="stepSize" value="10" min="1" max="500" step="1">
+        </div>
+        <div>
+          <label>Turn (°)</label>
+          <input type="number" id="turnAngle" value="90" min="1" max="180" step="1">
+        </div>
+      </div>
       <div class="dpad">
         <div></div>
         <button class="btn-secondary" onclick="manualMove('F')" aria-label="Move forward">&#x2191;</button>
@@ -675,6 +938,164 @@ si<!DOCTYPE html>
       <div class="log" id="logBox"></div>
     </div>
 
+  </div>
+
+</div>
+
+<!-- ── BLIND MODE LEFT PANEL ────────────────────────────────────────── -->
+<div id="blindPanel" role="complementary" aria-label="Blind mode controls">
+
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <span style="font-size:1.2rem">&#x1F508;</span>
+    <span style="font-size:0.9rem;font-weight:700;color:var(--accent)">Blind Mode Active</span>
+  </div>
+
+  <!-- ── Blind upload ─────────────────────────────────── -->
+  <div>
+    <div class="blind-h2">Upload Blueprint</div>
+    <input type="file" id="blindBlueprintFile" accept="image/*"
+           style="border-radius:8px;padding:8px;width:100%;font-size:0.82rem;margin-bottom:6px">
+    <div class="blind-input-row" style="margin-bottom:6px">
+      <div class="blind-field">
+        <label class="blind-label">Unit</label>
+        <select id="blindUnitSelect" class="blind-input" style="font-size:0.82rem">
+          <option value="ft" selected>Feet</option>
+          <option value="cm">cm</option>
+          <option value="m">m</option>
+        </select>
+      </div>
+      <div class="blind-field">
+        <label class="blind-label">Safety margin (cm)</label>
+        <input class="blind-input" type="number" id="blindSafetyMargin" value="10" min="0" step="1">
+      </div>
+    </div>
+    <div class="blind-field" style="margin-bottom:8px">
+      <label class="blind-label">Step size (cm) — your stride length</label>
+      <input class="blind-input" type="number" id="blindUploadStep" value="75" min="10" max="200" step="1">
+    </div>
+    <button class="btn-primary" id="blindUploadBtn" onclick="uploadBlueprint()">
+      &#x1F4E4; Upload &amp; Parse
+    </button>
+    <p id="blindUploadStatus" style="font-size:0.75rem;color:#64748b;margin-top:5px;min-height:1rem"></p>
+  </div>
+
+  <div>
+    <div class="blind-h2">Voice — Always On</div>
+    <button class="btn-voice-large" id="blindVoiceBtn" onclick="startBlindListening()" aria-label="Restart microphone">
+      &#x1F3A4; <span id="blindVoiceBtnText">Listening…</span>
+    </button>
+    <p style="font-size:0.72rem;color:var(--text-muted);margin-top:5px">
+      Say: <strong>"navigate to kitchen"</strong> · <strong>"start"</strong> · <strong>"next"</strong> · <strong>"repeat"</strong> · <strong>"stop"</strong> · <strong>"list rooms"</strong>
+    </p>
+    <p id="blindVoiceStatus" style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;min-height:1rem"></p>
+  </div>
+
+  <div>
+    <div class="blind-h2">Move Settings</div>
+    <div class="blind-input-row">
+      <div class="blind-field">
+        <label class="blind-label">Step distance (cm)</label>
+        <input class="blind-input" type="number" id="blindStepSize" value="10" min="1" max="500" step="1"
+               onchange="document.getElementById('stepSize').value=this.value"
+               aria-label="Step distance in centimetres">
+      </div>
+      <div class="blind-field">
+        <label class="blind-label">Turn angle (°)</label>
+        <input class="blind-input" type="number" id="blindTurnAngle" value="90" min="1" max="180" step="1"
+               onchange="document.getElementById('turnAngle').value=this.value"
+               aria-label="Turn angle in degrees">
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="blind-h2">Move Controls</div>
+    <div class="blind-dpad">
+      <div></div>
+      <button class="bdbtn-move" onclick="manualMove('F')" aria-label="Move forward">&#x2191;</button>
+      <div></div>
+      <button class="bdbtn-turn" onclick="manualMove('L')" aria-label="Turn left">&#x21B6;</button>
+      <button class="bdbtn-stop" onclick="manualMove('S')" aria-label="Emergency stop">STOP</button>
+      <button class="bdbtn-turn" onclick="manualMove('R')" aria-label="Turn right">&#x21B7;</button>
+      <div></div>
+      <button class="bdbtn-move" onclick="manualMove('B')" aria-label="Move backward">&#x2193;</button>
+      <div></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="blind-h2">Heading</div>
+    <select id="blindHeadingSelect" class="blind-input"
+            onchange="document.getElementById('headingSelect').value=this.value"
+            aria-label="Initial heading">
+      <option value="0">North — 0°</option>
+      <option value="45">NE — 45°</option>
+      <option value="90">East — 90°</option>
+      <option value="135">SE — 135°</option>
+      <option value="180">South — 180°</option>
+      <option value="225">SW — 225°</option>
+      <option value="270">West — 270°</option>
+      <option value="315">NW — 315°</option>
+    </select>
+  </div>
+
+</div>
+
+<!-- ── BLIND MODE RIGHT PANEL ───────────────────────────────────────── -->
+<div id="blindPanelRight" role="complementary" aria-label="Blind mode status">
+
+  <div>
+    <div class="blind-h2">Current Position</div>
+    <div class="blind-stat-row">
+      <div class="blind-stat-card">
+        <div class="blind-stat-big" id="bStatRow">—</div>
+        <div class="blind-stat-label">Row</div>
+      </div>
+      <div class="blind-stat-card">
+        <div class="blind-stat-big" id="bStatCol">—</div>
+        <div class="blind-stat-label">Col</div>
+      </div>
+      <div class="blind-stat-card">
+        <div class="blind-stat-big" id="bStatHeading">—</div>
+        <div class="blind-stat-label">Hdg°</div>
+      </div>
+    </div>
+    <div class="blind-location" id="bStatLocation" style="margin-top:8px">
+      No position set — tap the map or say "start at &lt;room&gt;"
+    </div>
+  </div>
+
+  <!-- ── Interactive step walkthrough ──────────────── -->
+  <div>
+    <div class="blind-h2">Current Step</div>
+    <div id="blindStepCard" style="background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div id="blindStepNum" style="font-size:0.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">No route loaded</div>
+      <div id="blindStepLabel" style="font-size:0.92rem;font-weight:600;color:var(--text);line-height:1.4">Navigate to a room to begin</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+      <button class="btn-primary" onclick="nextBlindCmd()" style="padding:12px;font-size:0.9rem">Next &#x25B6;</button>
+      <button class="btn-secondary" onclick="repeatBlindCmd()" style="padding:12px;font-size:0.9rem">&#x21BA; Repeat</button>
+    </div>
+    <p id="blindListenStatus" style="font-size:0.72rem;color:var(--text-muted);text-align:center;min-height:1.1rem">Say "next" or "repeat"</p>
+  </div>
+
+  <div>
+    <div class="blind-h2">All Steps</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:0.75rem;font-family:monospace;max-height:100px;overflow-y:auto" id="blindCmdList">
+      <span style="color:var(--text-muted);font-style:italic">No commands</span>
+    </div>
+  </div>
+
+  <div>
+    <div class="blind-h2">Navigate to Room</div>
+    <div id="blindRoomButtons" style="display:flex;flex-direction:column;gap:6px">
+      <p style="font-size:0.78rem;color:#475569">Upload a blueprint first</p>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0">
+    <div class="blind-h2">Log</div>
+    <div class="log" id="blindLogBox" style="max-height:none;flex:1"></div>
   </div>
 
 </div>
@@ -708,23 +1129,138 @@ let rawMaskImg      = null;
 let showPathOnCanvas = true;
 let blindModeEnabled = false;
 let lastAnnouncedSeq = 0;
+let blindCmdIndex    = -1;    // current step in blind walkthrough (-1 = not started)
+let blindListening   = false; // whether background listener is running
+let blindRecog       = null;  // active SpeechRecognition instance
+let _markerAnimId    = null;  // requestAnimationFrame handle for marker animation
+let blindStepLabels  = [];    // Groq-generated natural language step labels
+let _currentNavRoom  = "";    // room name for last navigate call
 
 // ── LOGGING ───────────────────────────────────────────────────────────────
 function log(msg, type = "info") {
-  const box = document.getElementById("logBox");
-  const el  = document.createElement("div");
-  el.className   = `log-${type}`;
-  el.textContent = `${new Date().toLocaleTimeString()} ${msg}`;
-  box.appendChild(el);
-  box.scrollTop = box.scrollHeight;
+  const ts  = new Date().toLocaleTimeString();
+  const text = `${ts} ${msg}`;
+
+  function addToBox(box) {
+    if (!box) return;
+    const el = document.createElement("div");
+    el.className   = `log-${type}`;
+    el.textContent = text;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  addToBox(document.getElementById("logBox"));
+  addToBox(document.getElementById("blindLogBox"));
   announceForBlind(msg, type);
+}
+
+// ── BLIND ROOM BUTTONS ────────────────────────────────────────────────────
+function renderBlindRoomButtons(rooms) {
+  const container = document.getElementById("blindRoomButtons");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const visible = rooms.filter(r => r.name.toUpperCase() !== "CORRIDOR");
+  if (!visible.length) {
+    container.innerHTML = '<p style="font-size:0.78rem;color:#475569">No rooms detected</p>';
+    return;
+  }
+
+  visible.forEach(room => {
+    const btn = document.createElement("button");
+    btn.className    = "blind-room-btn";
+    btn.dataset.room = room.name;
+    btn.textContent  = `\u{1F6AA} ${room.name}`;
+    if (room.dimensions) {
+      btn.textContent += ` (${room.dimensions.north_south}\xD7${room.dimensions.east_west})`;
+    }
+    btn.onclick = () => {
+      document.querySelectorAll(".blind-room-btn")
+        .forEach(b => b.classList.toggle("selected", b === btn));
+      setSelectedRoom(room.name);
+      navigateTo(room.name);
+    };
+    container.appendChild(btn);
+  });
+}
+
+function toggleBlindMode() {
+  const cb = document.getElementById("blindModeToggle");
+  cb.checked = !cb.checked;
+  setBlindMode(cb.checked);
 }
 
 function setBlindMode(enabled) {
   blindModeEnabled = enabled;
-  const msg = enabled ? "Blind mode audio enabled" : "Blind mode audio disabled";
-  announceForBlind(msg, "info", true);
-  log(msg);
+
+  // Toggle switch sync
+  const cb = document.getElementById("blindModeToggle");
+  if (cb) cb.checked = enabled;
+
+  // Blind mode row active state
+  const row = document.getElementById("blindModeRow");
+  if (row) row.classList.toggle("active", enabled);
+
+  // Voice section highlight
+  const sec = document.getElementById("voiceSection");
+  if (sec) sec.classList.toggle("blind-active", enabled);
+
+  // Header badge
+  const badge = document.getElementById("blindBadge");
+  if (badge) {
+    badge.style.display = enabled ? "" : "none";
+    badge.className = "badge" + (enabled ? " blind-on" : "");
+  }
+
+  // Full UI swap — add/remove body class that shows the blind panels
+  document.body.classList.toggle("blind-mode", enabled);
+
+
+  if (enabled) {
+    // Sync blind panel inputs from normal inputs
+    const ss = document.getElementById("stepSize");
+    const ta = document.getElementById("turnAngle");
+    const hs = document.getElementById("headingSelect");
+    if (ss) document.getElementById("blindStepSize").value  = ss.value;
+    if (ta) document.getElementById("blindTurnAngle").value = ta.value;
+    if (hs) document.getElementById("blindHeadingSelect").value = hs.value;
+
+    // Populate blind room buttons
+    renderBlindRoomButtons(parsedRooms);
+
+    // Sync status
+    updateStatusPanel();
+
+    // Resize canvas to fit new layout
+    if (blueprintImg) {
+      const canvas = document.getElementById("blueprintCanvas");
+      setTimeout(() => syncOverlaySizes(canvas), 50);
+    }
+
+    // Start always-on mic for the whole blind mode session
+    startBlindListening();
+
+    const welcomeMsg = parsedRooms.length
+      ? `Blind mode on. ${parsedRooms.length} rooms available. Say "navigate to" followed by a room name, or say "list rooms".`
+      : "Blind mode on. Upload a blueprint to begin.";
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(welcomeMsg);
+    utt.rate = 0.92;
+    window.speechSynthesis.speak(utt);
+    const live = document.getElementById("blindLive");
+    if (live) live.textContent = welcomeMsg;
+  } else {
+    // Restore canvas size for normal layout
+    if (blueprintImg) {
+      const canvas = document.getElementById("blueprintCanvas");
+      setTimeout(() => syncOverlaySizes(canvas), 50);
+    }
+    stopBlindListening();
+    announceForBlind("Blind mode off.", "ok", true);
+  }
+
+  log(enabled ? "Blind mode ON — full UI activated" : "Blind mode OFF", enabled ? "ok" : "info");
 }
 
 function announceForBlind(msg, type = "info", force = false) {
@@ -741,6 +1277,293 @@ function announceForBlind(msg, type = "info", force = false) {
   const utterance = new SpeechSynthesisUtterance(msg);
   utterance.rate = 0.95;
   window.speechSynthesis.speak(utterance);
+}
+
+// ── LOCAL COMMAND REPLAY (mirrors Python _replay_commands) ───────────────
+function replayCommandsLocally(startRow, startCol, startHeading, commands) {
+  const DEG_DIR = {
+    0:[-1,0], 45:[-1,1], 90:[0,1], 135:[1,1],
+    180:[1,0], 225:[1,-1], 270:[0,-1], 315:[-1,-1]
+  };
+  const SQRT2 = Math.sqrt(2);
+  let row = startRow, col = startCol;
+  let h   = ((startHeading % 360) + 360) % 360;
+  for (const cmd of commands) {
+    if (cmd.startsWith('R')) {
+      h = (h + parseInt(cmd.slice(1), 10)) % 360;
+    } else if (cmd.startsWith('L')) {
+      h = ((h - parseInt(cmd.slice(1), 10)) % 360 + 360) % 360;
+    } else if (cmd.startsWith('F') || cmd.startsWith('B')) {
+      const fwd = cmd[0] === 'F';
+      const [dr, dc] = DEG_DIR[h] || [-1, 0];
+      const distCm   = parseFloat(cmd.slice(1));
+      const isDiag   = dr !== 0 && dc !== 0;
+      const steps    = Math.round(distCm / (realCmPerCell * (isDiag ? SQRT2 : 1.0)));
+      const sign     = fwd ? 1 : -1;
+      row = Math.round(row + sign * dr * steps);
+      col = Math.round(col + sign * dc * steps);
+    }
+  }
+  return { row, col, heading: h };
+}
+
+// ── SMOOTH MARKER ANIMATION ───────────────────────────────────────────────
+function animatePoseTo(targetRow, targetCol, targetHeading, durationMs = 500) {
+  if (_markerAnimId) { cancelAnimationFrame(_markerAnimId); _markerAnimId = null; }
+
+  const startRow = robotPose.row;
+  const startCol = robotPose.col;
+  const startH   = robotPose.heading;
+
+  // shortest angular path
+  let diff = ((targetHeading - startH) % 360 + 540) % 360 - 180;
+  const endH = startH + diff;
+
+  const t0 = performance.now();
+  function ease(t) { return t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t; }
+
+  function frame(now) {
+    const raw = Math.min(1, (now - t0) / durationMs);
+    const e   = ease(raw);
+    robotPose = {
+      row:     startRow + (targetRow - startRow) * e,
+      col:     startCol + (targetCol - startCol) * e,
+      heading: ((startH + diff * e) % 360 + 360) % 360,
+    };
+    poseSet = true;
+    redrawCanvas();
+
+    if (raw < 1) {
+      _markerAnimId = requestAnimationFrame(frame);
+    } else {
+      _markerAnimId = null;
+      robotPose = { row: targetRow, col: targetCol, heading: targetHeading };
+      poseSet   = true;
+      redrawCanvas();
+      updateStatusPanel();
+      // Keep server in sync (fire-and-forget)
+      fetch(`${API}/set-pose`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ row: targetRow, col: targetCol, heading: targetHeading }),
+      }).catch(() => {});
+    }
+  }
+  _markerAnimId = requestAnimationFrame(frame);
+}
+
+// ── BLIND MODE COMMAND WALKTHROUGH ───────────────────────────────────────
+function updateBlindCommandCard(spokenLabel) {
+  const numEl   = document.getElementById("blindStepNum");
+  const labelEl = document.getElementById("blindStepLabel");
+  const card    = document.getElementById("blindStepCard");
+  if (!numEl || !labelEl) return;
+
+  if (!fullCmdList.length) {
+    numEl.textContent   = "";
+    labelEl.textContent = "Navigate to a room to begin";
+    if (card) { card.style.background = "var(--surface2)"; card.style.borderColor = "var(--border)"; }
+    return;
+  }
+  if (blindCmdIndex >= fullCmdList.length) {
+    numEl.textContent   = "";
+    labelEl.textContent = "You have arrived!";
+    if (card) { card.style.background = "var(--green-lt)"; card.style.borderColor = "var(--green)"; }
+    return;
+  }
+  const label = spokenLabel
+    || blindStepLabels[blindCmdIndex]
+    || simpleLabel(fullCmdList[blindCmdIndex]);
+  numEl.textContent   = `${blindCmdIndex + 1} / ${fullCmdList.length}`;
+  labelEl.textContent = label;
+  if (card) { card.style.background = "var(--accent-lt)"; card.style.borderColor = "var(--accent)"; }
+}
+
+function announceBlindCmd(idx) {
+  if (idx < 0 || idx >= fullCmdList.length) return;
+  const spoken = blindStepLabels[idx] || simpleLabel(fullCmdList[idx]);
+  updateBlindCommandCard(spoken);
+  const listEl = document.getElementById("blindCmdList");
+  if (listEl) {
+    const active = listEl.querySelector(".cmd-active");
+    if (active) active.scrollIntoView({ block: "nearest" });
+  }
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(spoken);
+  utt.rate = 0.9;
+  window.speechSynthesis.speak(utt);
+  const live = document.getElementById("blindLive");
+  if (live) live.textContent = spoken;
+}
+
+function nextBlindCmd() {
+  if (!fullCmdList.length || blindCmdIndex < 0) {
+    const msg = "No route loaded. Navigate to a room first.";
+    announceForBlind(msg, "info", true);
+    return;
+  }
+
+  // Animate marker for the command the user just physically completed
+  if (poseSet && blindCmdIndex < fullCmdList.length) {
+    const newPose = replayCommandsLocally(
+      Math.round(robotPose.row), Math.round(robotPose.col),
+      Math.round(robotPose.heading), [fullCmdList[blindCmdIndex]]
+    );
+    animatePoseTo(newPose.row, newPose.col, newPose.heading, 600);
+  }
+
+  blindCmdIndex++;
+
+  if (blindCmdIndex >= fullCmdList.length) {
+    blindCmdIndex = fullCmdList.length;
+    updateBlindCommandCard();
+    const msg = blindStepLabels[fullCmdList.length] || "You have arrived!";
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(msg);
+    utt.rate = 0.9;
+    window.speechSynthesis.speak(utt);
+    const live = document.getElementById("blindLive");
+    if (live) live.textContent = msg;
+    return;
+  }
+
+  announceBlindCmd(blindCmdIndex);
+  renderCommandQueue(fullCmdList, blindCmdIndex);
+}
+
+function repeatBlindCmd() {
+  if (blindCmdIndex < 0 || !fullCmdList.length) {
+    announceForBlind("Navigate to a room first.", "info", true);
+    return;
+  }
+  if (blindCmdIndex >= fullCmdList.length) {
+    const msg = blindStepLabels[fullCmdList.length] || "You have arrived!";
+    announceForBlind(msg, "ok", true);
+    return;
+  }
+  announceBlindCmd(blindCmdIndex);
+}
+
+function startBlindWalkthrough() {
+  if (_markerAnimId) { cancelAnimationFrame(_markerAnimId); _markerAnimId = null; }
+  blindStepLabels = [];
+  blindCmdIndex   = 0;
+  renderCommandQueue(fullCmdList, 0);
+  // Announce first command immediately
+  announceBlindCmd(0);
+  // Fetch Groq labels in background — will re-announce when ready
+  if (_currentNavRoom) fetchGroqLabels(fullCmdList, _currentNavRoom);
+}
+
+function startBlindListening() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  stopBlindListening();   // clear any prior instance
+  blindListening = true;
+
+  const statusEl = document.getElementById("blindListenStatus");
+
+  function listen() {
+    if (!blindListening || !blindModeEnabled) return;
+
+    const recog = new SR();
+    blindRecog  = recog;
+    recog.continuous     = false;
+    recog.interimResults = false;
+    recog.lang           = "en-US";
+
+    const btnTxt = document.getElementById("blindVoiceBtnText");
+    if (statusEl) statusEl.textContent = '🎤 Listening…';
+    if (btnTxt) btnTxt.textContent = "Listening…";
+
+    recog.onresult = ({ results }) => {
+      const t = results[0][0].transcript.toLowerCase().trim();
+      log(`Voice: "${t}"`);
+      const vs2 = document.getElementById("blindVoiceStatus");
+      if (vs2) vs2.textContent = `Heard: "${t}"`;
+      handleBlindModeVoice(t);
+    };
+
+    recog.onerror = ({ error }) => {
+      if (error === "not-allowed" || error === "service-not-allowed") {
+        if (statusEl) statusEl.textContent = "Microphone access denied — tap button to retry";
+        if (btnTxt) btnTxt.textContent = "Tap to retry";
+        blindListening = false;
+      }
+      // no-speech / aborted — onend restarts
+    };
+
+    recog.onend = () => {
+      if (blindListening && blindModeEnabled) {
+        setTimeout(listen, 300);
+      } else {
+        if (statusEl) statusEl.textContent = "Mic off";
+        if (btnTxt) btnTxt.textContent = "Tap to start mic";
+      }
+    };
+
+    try { recog.start(); } catch (e) { /* already started */ }
+  }
+
+  listen();
+}
+
+function stopBlindListening() {
+  blindListening = false;
+  if (blindRecog) {
+    try { blindRecog.stop(); } catch (e) {}
+    blindRecog = null;
+  }
+  const statusEl = document.getElementById("blindListenStatus");
+  if (statusEl) statusEl.textContent = "Mic off";
+}
+
+function handleBlindModeVoice(t) {
+  // Navigation intent must be checked FIRST — "go to kitchen" contains "go"
+  // which would otherwise be swallowed by the next-step regex below.
+  const NAV_TRIGGERS = [
+    "go to", "take me to", "navigate to", "i need to go to", "i want to go to",
+    "bring me to", "drive to", "proceed to", "get me to", "lets go to",
+    "let's go to", "head to", "move to",
+  ];
+  if (NAV_TRIGGERS.some(p => t.includes(p))) {
+    handleVoiceCommand(t);
+    return;
+  }
+
+  // Walkthrough: begin (or restart) announcing commands from step 1
+  if (/\b(start|begin|read commands|read steps|announce)\b/.test(t)) {
+    if (fullCmdList.length) {
+      startBlindWalkthrough();
+    } else {
+      announceForBlind("No route loaded. Navigate to a room first.", "info", true);
+    }
+    return;
+  }
+
+  // Walkthrough: advance to next step
+  // "go" and "proceed" removed — they are navigation words
+  if (/\b(next|continue|yes|okay|ok|done|got it|ready|move on)\b/.test(t)) {
+    nextBlindCmd();
+    return;
+  }
+
+  // Walkthrough: repeat current step
+  // "what" removed — it starts questions ("what rooms are available")
+  if (/\b(repeat|again|say again|pardon|sorry|come again|huh|what was that)\b/.test(t)) {
+    repeatBlindCmd();
+    return;
+  }
+
+  // Stop
+  if (/\b(stop|cancel|abort|halt)\b/.test(t)) {
+    manualMove("S");
+    return;
+  }
+
+  // Everything else: questions, set-start, unrecognised → handleVoiceCommand
+  // which routes questions to Groq chat and room names to navigation
+  handleVoiceCommand(t);
 }
 
 function roomListText() {
@@ -792,12 +1615,21 @@ async function setPoseFromRoom(roomName) {
 
 // ── UPLOAD ────────────────────────────────────────────────────────────────
 async function uploadBlueprint() {
-  const file = document.getElementById("blueprintFile").files[0];
+  // Blind mode reads from blind panel; normal mode reads from normal panel
+  const fileEl = blindModeEnabled
+    ? document.getElementById("blindBlueprintFile")
+    : document.getElementById("blueprintFile");
+  const file = fileEl?.files[0];
   if (!file) { log("No file selected", "err"); return; }
 
-  const btn = document.getElementById("uploadBtn");
+  // Disable whichever upload button triggered this
+  const btn     = blindModeEnabled
+    ? document.getElementById("blindUploadBtn")
+    : document.getElementById("uploadBtn");
+  const statusEl = document.getElementById("blindUploadStatus");
   btn.disabled    = true;
   btn.textContent = "Parsing...";
+  if (statusEl) statusEl.textContent = "Parsing blueprint…";
   setBadge("parseBadge", "Parsing...", "active");
   showSpinner(true);
   log("Upload started — OCR running...");
@@ -806,10 +1638,19 @@ async function uploadBlueprint() {
   navGoal     = null;
   fullCmdList = [];
 
-  const unit         = document.getElementById("unitSelect").value;
-  const robotWidth   = document.getElementById("robotWidth").value;
-  const robotLength  = document.getElementById("robotLength").value;
-  const safetyMargin = document.getElementById("safetyMargin").value;
+  let unit, robotWidth, robotLength, safetyMargin;
+  if (blindModeEnabled) {
+    unit         = document.getElementById("blindUnitSelect").value;
+    const step   = document.getElementById("blindUploadStep").value || "75";
+    robotWidth   = step;
+    robotLength  = step;
+    safetyMargin = document.getElementById("blindSafetyMargin").value;
+  } else {
+    unit         = document.getElementById("unitSelect").value;
+    robotWidth   = document.getElementById("robotWidth").value;
+    robotLength  = document.getElementById("robotLength").value;
+    safetyMargin = document.getElementById("safetyMargin").value;
+  }
 
   const fd = new FormData();
   fd.append("blueprint", file);
@@ -894,9 +1735,13 @@ function loadImageToCanvas(file) {
     loadOverlays();
     showSpinner(false);
 
-    const btn     = document.getElementById("uploadBtn");
+    const btn = document.getElementById(blindModeEnabled ? "blindUploadBtn" : "uploadBtn");
     btn.disabled  = false;
     btn.innerHTML = '&#x1F4E4; Upload &amp; Parse';
+    const statusEl2 = document.getElementById("blindUploadStatus");
+    if (statusEl2) statusEl2.textContent = parsedRooms.length
+      ? `${parsedRooms.length} room${parsedRooms.length !== 1 ? 's' : ''} found`
+      : "Parsed — no rooms detected";
   };
   img.onerror = () => { log("Image load failed", "err"); showSpinner(false); };
   img.src = URL.createObjectURL(file);
@@ -1065,42 +1910,101 @@ function redrawCanvas() {
 function drawRobot(ctx, cs) {
   const x = robotPose.col * cs + cs / 2;
   const y = robotPose.row * cs + cs / 2;
-
-  // Robot dimensions in pixels (clamped to at least 8px so it's always visible)
-  const wPx = Math.max(8, (robotWidthCm  / realCmPerCell) * cs);
-  const lPx = Math.max(8, (robotLengthCm / realCmPerCell) * cs);
-
-  // heading is degrees CW from North; canvas rotate() is CW-positive with y-down
-  // heading=0(N)→0, heading=90(E)→π/2, heading=270(W)→3π/2
   const rot = (robotPose.heading * Math.PI) / 180;
 
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rot);
 
-  // Glow
-  ctx.beginPath();
-  ctx.roundRect(-wPx / 2 - 4, -lPx / 2 - 4, wPx + 8, lPx + 8, 6);
-  ctx.fillStyle = "rgba(22,163,74,0.18)";
-  ctx.fill();
+  if (blindModeEnabled) {
+    // ── Person icon ───────────────────────────────────────────────────────
+    const r = Math.max(10, cs * 0.55);
 
-  // Body rectangle
-  ctx.beginPath();
-  ctx.roundRect(-wPx / 2, -lPx / 2, wPx, lPx, 4);
-  ctx.fillStyle   = "#16a34a";
-  ctx.fill();
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth   = 2;
-  ctx.stroke();
+    // Glow halo
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(37,99,235,0.15)";
+    ctx.fill();
 
-  // Front indicator (small triangle pointing forward = up before rotation)
-  ctx.beginPath();
-  ctx.moveTo(0, -lPx / 2 + 2);
-  ctx.lineTo(-wPx / 4, -lPx / 2 + Math.min(wPx / 2, lPx / 3));
-  ctx.lineTo( wPx / 4, -lPx / 2 + Math.min(wPx / 2, lPx / 3));
-  ctx.closePath();
-  ctx.fillStyle = "#fff";
-  ctx.fill();
+    // Head
+    const headR = r * 0.27;
+    const headCY = -r * 0.52;
+    ctx.beginPath();
+    ctx.arc(0, headCY, headR, 0, Math.PI * 2);
+    ctx.fillStyle = "#2563eb";
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Body
+    const bodyTop = headCY + headR;
+    const bodyBot = r * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(0, bodyTop);
+    ctx.lineTo(0, bodyBot);
+    ctx.strokeStyle = "#2563eb";
+    ctx.lineWidth = Math.max(2, r * 0.18);
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    // Arms
+    const armY = bodyTop + (bodyBot - bodyTop) * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.38, armY);
+    ctx.lineTo(r * 0.38, armY);
+    ctx.strokeStyle = "#2563eb";
+    ctx.lineWidth = Math.max(1.5, r * 0.12);
+    ctx.stroke();
+
+    // Legs
+    ctx.beginPath();
+    ctx.moveTo(0, bodyBot);
+    ctx.lineTo(-r * 0.28, r * 0.52);
+    ctx.moveTo(0, bodyBot);
+    ctx.lineTo(r * 0.28, r * 0.52);
+    ctx.strokeStyle = "#2563eb";
+    ctx.lineWidth = Math.max(1.5, r * 0.12);
+    ctx.stroke();
+
+    // Direction arrow (pointing forward = up before rotation)
+    ctx.beginPath();
+    ctx.moveTo(0, -r - 2);
+    ctx.lineTo(-r * 0.22, -r * 0.72);
+    ctx.lineTo(r * 0.22, -r * 0.72);
+    ctx.closePath();
+    ctx.fillStyle = "#f59e0b";
+    ctx.fill();
+
+  } else {
+    // ── Wheelchair / robot rectangle ─────────────────────────────────────
+    const wPx = Math.max(8, (robotWidthCm  / realCmPerCell) * cs);
+    const lPx = Math.max(8, (robotLengthCm / realCmPerCell) * cs);
+
+    // Glow
+    ctx.beginPath();
+    ctx.roundRect(-wPx / 2 - 4, -lPx / 2 - 4, wPx + 8, lPx + 8, 6);
+    ctx.fillStyle = "rgba(22,163,74,0.18)";
+    ctx.fill();
+
+    // Body rectangle
+    ctx.beginPath();
+    ctx.roundRect(-wPx / 2, -lPx / 2, wPx, lPx, 4);
+    ctx.fillStyle   = "#16a34a";
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth   = 2;
+    ctx.stroke();
+
+    // Front indicator triangle
+    ctx.beginPath();
+    ctx.moveTo(0, -lPx / 2 + 2);
+    ctx.lineTo(-wPx / 4, -lPx / 2 + Math.min(wPx / 2, lPx / 3));
+    ctx.lineTo( wPx / 4, -lPx / 2 + Math.min(wPx / 2, lPx / 3));
+    ctx.closePath();
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+  }
 
   ctx.restore();
 }
@@ -1191,6 +2095,8 @@ function renderRoomButtons(rooms) {
     return;
   }
 
+  renderBlindRoomButtons(rooms);
+
   visible.forEach(room => {
     const btn = document.createElement("button");
     btn.className    = "room-btn";
@@ -1223,6 +2129,7 @@ async function navigateTo(roomName) {
     log("Set robot start first. In blind mode, say set start at followed by a room name.", "err");
     return;
   }
+  _currentNavRoom = roomName;
   log(`Navigating to ${roomName}...`);
 
   document.getElementById("cmdList").innerHTML =
@@ -1247,6 +2154,8 @@ async function navigateTo(roomName) {
     fullCmdList = [...(data.commands || [])];
     lastAnnouncedSeq = 0;
     renderCommandQueue(fullCmdList, 0);
+
+    if (blindModeEnabled) startBlindWalkthrough();
 
     const [startRow, startCol] = data.start;
     const [goalRow,  goalCol]  = data.goal;
@@ -1303,33 +2212,111 @@ function commandsToPath(startRow, startCol, heading, commands) {
   return pts;
 }
 
-// ── COMMAND QUEUE DISPLAY ─────────────────────────────────────────────────
-function renderCommandQueue(full, consumed) {
-  const box = document.getElementById("cmdList");
-  box.innerHTML = "";
+// ── SIMPLE SPOKEN LABEL (no numbers / tech terms) ────────────────────────
+function getStepSizeCm() {
+  const el = document.getElementById("blindUploadStep") || document.getElementById("blindStepSize");
+  const v  = parseFloat(el?.value);
+  return (v > 0) ? v : 75;
+}
 
-  if (!full.length) {
-    box.innerHTML = '<span class="cmd-empty">No commands</span>';
-    return;
+function simpleLabel(cmd) {
+  if (!cmd) return "";
+  if (cmd.startsWith('R') || cmd.startsWith('L')) {
+    const deg = parseInt(cmd.slice(1), 10);
+    const dir = cmd[0] === 'R' ? 'right' : 'left';
+    if (deg >= 160) return 'Turn around';
+    if (deg >= 110) return `Turn sharply ${dir}`;
+    if (deg >= 70)  return `Turn ${dir}`;
+    return `Turn slightly ${dir}`;
+  }
+  const stepCm  = getStepSizeCm();
+  const distCm  = parseFloat(cmd.slice(1));
+  const steps   = Math.max(1, Math.round(distCm / stepCm));
+  const plural  = steps !== 1 ? 'steps' : 'step';
+  if (cmd.startsWith('F')) return `Walk forward ${steps} ${plural}`;
+  if (cmd.startsWith('B')) return `Step back ${steps} ${plural}`;
+  return cmd;
+}
+
+// ── GROQ NAVIGATION LABELS ────────────────────────────────────────────────
+async function fetchGroqLabels(commands, targetRoom) {
+  try {
+    const res  = await fetch(`${API}/groq-labels`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ commands, target: targetRoom, step_size_cm: getStepSizeCm() }),
+    });
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.labels) && data.labels.length) {
+      blindStepLabels = data.labels;
+      // Re-announce current step with the better label if walkthrough is live
+      if (blindModeEnabled && blindCmdIndex >= 0 && blindCmdIndex < fullCmdList.length) {
+        announceBlindCmd(blindCmdIndex);
+      }
+    } else {
+      blindStepLabels = [];
+      if (data.reason === 'no_key')
+        log('Add GROQ_API_KEY env var for natural voice guidance', 'info');
+    }
+  } catch (_) {
+    blindStepLabels = [];
+  }
+}
+
+// ── COMMAND QUEUE DISPLAY ─────────────────────────────────────────────────
+function cmdToLabel(cmd) {
+  const stepCm = parseFloat(document.getElementById("blindUploadStep")?.value ||
+                             document.getElementById("blindStepSize")?.value || 75);
+  if (cmd.startsWith('R') || cmd.startsWith('L')) {
+    const deg = parseInt(cmd.slice(1), 10);
+    const dir = cmd[0] === 'R' ? 'right' : 'left';
+    if (deg === 180) return `Turn around (180°)`;
+    if (deg === 90)  return `Turn ${dir} — quarter turn`;
+    if (deg === 45)  return `Turn ${dir} slightly (45°)`;
+    if (deg === 135) return `Turn ${dir} — three-quarter`;
+    return `Turn ${dir} ${deg}°`;
+  }
+  if (cmd.startsWith('F') || cmd.startsWith('B')) {
+    const fwd   = cmd[0] === 'F';
+    const distCm = parseFloat(cmd.slice(1));
+    const steps  = Math.max(1, Math.round(distCm / stepCm));
+    return `${fwd ? 'Walk forward' : 'Step back'} ${steps} step${steps !== 1 ? 's' : ''} (~${Math.round(distCm)} cm)`;
+  }
+  return cmd;
+}
+
+function renderCommandQueue(full, consumed) {
+  function fillBox(box, isBlind) {
+    if (!box) return;
+    box.innerHTML = "";
+    if (!full.length) {
+      const s = document.createElement("span");
+      s.style.cssText = "color:#475569;font-style:italic";
+      s.textContent = "No commands";
+      box.appendChild(s);
+      return;
+    }
+    full.forEach((cmd, i) => {
+      const label = isBlind ? cmdToLabel(cmd) : cmd;
+      const div = document.createElement("div");
+      if (i < consumed) {
+        div.className   = "cmd-done";
+        div.textContent = `${i + 1}. ${label}`;
+      } else if (i === consumed) {
+        div.className   = "cmd-active";
+        div.textContent = `> ${i + 1}. ${label}`;
+      } else {
+        div.className   = "cmd-pending";
+        div.textContent = `${i + 1}. ${label}`;
+      }
+      box.appendChild(div);
+    });
+    const active = box.querySelector(".cmd-active");
+    if (active) active.scrollIntoView({ block: "nearest" });
   }
 
-  full.forEach((cmd, i) => {
-    const div = document.createElement("div");
-    if (i < consumed) {
-      div.className   = "cmd-done";
-      div.textContent = `${i + 1}. ${cmd}`;
-    } else if (i === consumed) {
-      div.className   = "cmd-active";
-      div.textContent = `> ${i + 1}. ${cmd}`;
-    } else {
-      div.className   = "cmd-pending";
-      div.textContent = `${i + 1}. ${cmd}`;
-    }
-    box.appendChild(div);
-  });
-
-  const active = box.querySelector(".cmd-active");
-  if (active) active.scrollIntoView({ block: "nearest" });
+  fillBox(document.getElementById("cmdList"), false);
+  fillBox(document.getElementById("blindCmdList"), true);
 }
 
 // ── STATUS PANEL ──────────────────────────────────────────────────────────
@@ -1338,6 +2325,28 @@ function updateStatusPanel() {
   document.getElementById("statCol").textContent     = poseSet ? robotPose.col     : "—";
   document.getElementById("statHeading").textContent = poseSet ? robotPose.heading : "—";
   document.getElementById("statQueue").textContent   = fullCmdList.length || "—";
+
+  // Mirror into blind panel
+  document.getElementById("bStatRow").textContent     = poseSet ? robotPose.row     : "—";
+  document.getElementById("bStatCol").textContent     = poseSet ? robotPose.col     : "—";
+  document.getElementById("bStatHeading").textContent = poseSet ? robotPose.heading + "°" : "—";
+
+  const loc = document.getElementById("bStatLocation");
+  if (loc) {
+    if (!poseSet) {
+      loc.textContent = 'No position set — tap map or say "start at <room>"';
+      loc.style.background = "";
+      loc.style.borderColor = "";
+      loc.style.color = "";
+    } else {
+      const headingNames = {0:"North",45:"NE",90:"East",135:"SE",180:"South",225:"SW",270:"West",315:"NW"};
+      const hdgName = headingNames[robotPose.heading] || robotPose.heading + "°";
+      loc.textContent = `At (${robotPose.row}, ${robotPose.col}) facing ${hdgName}`;
+      loc.style.background = "";
+      loc.style.borderColor = "";
+      loc.style.color = "";
+    }
+  }
 }
 
 
@@ -1356,12 +2365,9 @@ async function pollStatus() {
     if (data.robot_pose && data.robot_pose.row != null) {
       const sp  = data.robot_pose;
       const key = `${sp.row},${sp.col},${sp.heading}`;
-      if (key !== lastPoseKey) {
-        robotPose  = { row: sp.row, col: sp.col, heading: sp.heading };
-        poseSet    = true;
+      if (key !== lastPoseKey && !_markerAnimId) {  // don't interrupt manual animation
         lastPoseKey = key;
-        updateStatusPanel();
-        redrawCanvas();
+        animatePoseTo(sp.row, sp.col, sp.heading, 700);
       }
     }
 
@@ -1369,16 +2375,19 @@ async function pollStatus() {
       const consumed = data.last_synced_seq || 0;
       document.getElementById("statQueue").textContent = Math.max(0, fullCmdList.length - consumed);
       renderCommandQueue(fullCmdList, consumed);
-      if (blindModeEnabled && consumed !== lastAnnouncedSeq) {
+      // In blind mode the user-driven walkthrough owns announcements;
+      // only auto-announce when Firebase is actually executing commands (ESP32 mode)
+      if (blindModeEnabled && consumed !== lastAnnouncedSeq && blindCmdIndex < 0) {
         lastAnnouncedSeq = consumed;
         const remainingNow = Math.max(0, fullCmdList.length - consumed);
         announceForBlind(
           remainingNow > 0
-            ? `Command ${consumed} completed. ${remainingNow} commands remaining.`
+            ? `Command ${consumed} completed. ${remainingNow} remaining.`
             : "Route completed.",
-          "ok",
-          true
+          "ok", true
         );
+      } else {
+        lastAnnouncedSeq = consumed;
       }
 
       // Poll faster while commands are actively executing
@@ -1449,20 +2458,34 @@ function resetAll() {
 
 // ── MANUAL CONTROLS ───────────────────────────────────────────────────────
 async function manualMove(dir) {
-  const labels = { F:"Forward 10cm", B:"Backward 10cm", L:"Left 90°", R:"Right 90°", S:"STOP" };
+  const stepCm  = parseFloat(
+    (blindModeEnabled
+      ? document.getElementById("blindStepSize")
+      : document.getElementById("stepSize"))?.value || 10
+  );
+  const turnDeg = parseInt(
+    (blindModeEnabled
+      ? document.getElementById("blindTurnAngle")
+      : document.getElementById("turnAngle"))?.value || 90, 10
+  );
+  const labels = {
+    F: `Forward ${stepCm}cm`, B: `Backward ${stepCm}cm`,
+    L: `Left ${turnDeg}°`,    R: `Right ${turnDeg}°`,    S: "STOP"
+  };
   if (!poseSet && dir !== "S") { log("Set robot position first", "err"); return; }
   log(`Manual: ${labels[dir] || dir}`);
   try {
     const res  = await fetch(`${API}/manual-move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dir }),
+      body: JSON.stringify({ dir, step_cm: stepCm, turn_deg: turnDeg }),
     });
     const data = await res.json();
     if (data.ok) {
       if (dir === "S") {
-        // STOP: clear the queue display immediately
-        fullCmdList = [];
+        fullCmdList   = [];
+        blindCmdIndex = -1;
+        updateBlindCommandCard();
         renderCommandQueue([], 0);
         log("Queue cleared — stopped", "ok");
       } else if (data.queued) {
@@ -1476,12 +2499,9 @@ async function manualMove(dir) {
           if (data.obstacle_cell) flashObstacle(data.obstacle_cell[0], data.obstacle_cell[1]);
         }
       } else {
-        // Firebase disabled fallback: apply pose immediately
-        robotPose   = data.pose;
-        poseSet     = true;
+        // Firebase disabled: animate marker to new position
         lastPoseKey = `${data.pose.row},${data.pose.col},${data.pose.heading}`;
-        updateStatusPanel();
-        redrawCanvas();
+        animatePoseTo(data.pose.row, data.pose.col, data.pose.heading, 400);
         if (data.warning) {
           log(data.warning, "err");
           showToast(data.warning);
@@ -1511,8 +2531,10 @@ function flashObstacle(row, col) {
 
 // ── VOICE ─────────────────────────────────────────────────────────────────
 async function handleVoiceCommand(transcript) {
-  if (transcript.includes("list rooms") || transcript.includes("available rooms")) {
-    log(`Rooms: ${roomListText()}`, "ok");
+  // Detect questions — route to Groq chat assistant in blind mode
+  const QUESTION_STARTS = /^(what|how|where|which|when|who|is there|are there|can you|do you|tell me|how far|how many|what's|where's|is the|are the)/;
+  if (blindModeEnabled && (QUESTION_STARTS.test(transcript) || transcript.endsWith("?"))) {
+    await askGroqChat(transcript);
     return;
   }
 
@@ -1540,7 +2562,8 @@ async function handleVoiceCommand(transcript) {
       const match = findRoomFromText(roomText);
       if (!match) {
         log(`No start room matched: "${roomText || transcript}"`, "err");
-        log(`Available: ${roomListText()}`, "info");
+        if (blindModeEnabled) await askGroqChat(transcript);
+        else log(`Available: ${roomListText()}`, "info");
         return;
       }
       await setPoseFromRoom(match.name);
@@ -1567,9 +2590,56 @@ async function handleVoiceCommand(transcript) {
     setSelectedRoom(match.name);
     navigateTo(match.name);
   } else {
-    log(`No room matched: "${transcript}"`, "err");
-    log(`Available: ${roomListText()}`, "info");
+    if (blindModeEnabled) {
+      await askGroqChat(transcript);
+    } else {
+      log(`No room matched: "${transcript}"`, "err");
+      log(`Available: ${roomListText()}`, "info");
+    }
   }
+}
+
+// ── GROQ CONVERSATIONAL ASSISTANT ─────────────────────────────────────────
+async function askGroqChat(question) {
+  const statusEl = document.getElementById("blindListenStatus");
+  const vs2      = document.getElementById("blindVoiceStatus");
+  if (statusEl) statusEl.textContent = "Thinking…";
+  if (vs2)      vs2.textContent      = `Heard: "${question}"`;
+  log(`Asking assistant: "${question}"`);
+
+  // Say something immediately so the user knows we heard them
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(new SpeechSynthesisUtterance("One moment…"));
+
+  try {
+    const res  = await fetch(`${API}/groq-chat`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ question }),
+    });
+    const data = await res.json();
+
+    if (data.ok && data.answer) {
+      log(data.answer, "ok");
+      window.speechSynthesis.cancel();
+      const utt  = new SpeechSynthesisUtterance(data.answer);
+      utt.rate   = 0.9;
+      window.speechSynthesis.speak(utt);
+    } else {
+      console.error("Groq chat failed:", data);
+      log(`Assistant error: ${data.reason || "unknown"}`, "err");
+      const fallback = `Sorry, I could not answer that. Say a room name to navigate, or ask me a question.`;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(fallback));
+    }
+  } catch (err) {
+    console.error("askGroqChat fetch error:", err);
+    log(`Chat fetch error: ${err.message}`, "err");
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance("Sorry, I had a connection error."));
+  }
+
+  if (statusEl) statusEl.textContent = "Listening…";
 }
 
 function startVoice() {
@@ -1580,24 +2650,33 @@ function startVoice() {
   recog.lang          = "en-US";
   recog.interimResults = false;
 
-  const btn = document.getElementById("voiceBtn");
-  btn.classList.add("listening");
-  btn.innerHTML = '&#x1F534; Listening...';
+  const btn  = document.getElementById("voiceBtn");
+  const btn2 = document.getElementById("blindVoiceBtn");
+  [btn, btn2].forEach(b => { if (b) { b.classList.add("listening"); b.innerHTML = '&#x1F534; Listening...'; } });
   document.getElementById("voiceStatus").textContent = "Speak now...";
+  const vs2 = document.getElementById("blindVoiceStatus");
+  if (vs2) vs2.textContent = "Speak now...";
 
   recog.onresult = ({ results }) => {
     const transcript = results[0][0].transcript.toLowerCase();
     log(`Voice: "${transcript}"`);
     document.getElementById("voiceStatus").textContent = `Heard: "${transcript}"`;
-    handleVoiceCommand(transcript);
+    const vs2 = document.getElementById("blindVoiceStatus");
+    if (vs2) vs2.textContent = `Heard: "${transcript}"`;
+    if (blindModeEnabled) {
+      handleBlindModeVoice(transcript);
+    } else {
+      handleVoiceCommand(transcript);
+    }
   };
 
   recog.onerror = ({ error }) => log(`Voice error: ${error}`, "err");
 
   recog.onend = () => {
-    btn.classList.remove("listening");
-    btn.innerHTML = '&#x1F3A4; Say destination';
+    [btn, btn2].forEach(b => { if (b) { b.classList.remove("listening"); b.innerHTML = '&#x1F3A4; Say destination'; } });
     document.getElementById("voiceStatus").textContent = "";
+    const vs2 = document.getElementById("blindVoiceStatus");
+    if (vs2) vs2.textContent = "";
   };
 
   recog.start();

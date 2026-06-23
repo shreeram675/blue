@@ -5,23 +5,21 @@ from grid_generator import generate_grid
 
 # ── A* ALGORITHM ───────────────────────────────────────────────────────────
 def heuristic(a, b):
-    # Octile distance for 8-directional grid
-    dr, dc = abs(a[0] - b[0]), abs(a[1] - b[1])
-    return (dr + dc) + (math.sqrt(2) - 2) * min(dr, dc)
+    # Manhattan distance — correct for 4-directional grid
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 def astar(grid, start, goal, dist_transform=None, wall_weight=3.0):
     """
-    8-directional A*.  Diagonal moves are blocked if either adjacent cardinal
-    cell is a wall (no corner-cutting).  When dist_transform is supplied,
-    a wall_weight/distance penalty is added so the planner prefers corridor
-    centres over wall-hugging routes.
+    4-directional A* (N/S/E/W only).  No diagonal moves — produces clean
+    axis-aligned paths through corridors with no zigzag S-curves.
+    When dist_transform is supplied, a wall_weight/distance penalty keeps
+    the path away from walls (corridor-centring).
     """
     rows, cols = grid.shape
     open_set = []
     heapq.heappush(open_set, (0.0, start))
     came_from = {}
     g_score = {start: 0.0}
-    SQRT2 = math.sqrt(2)
 
     while open_set:
         _, current = heapq.heappop(open_set)
@@ -32,20 +30,14 @@ def astar(grid, start, goal, dist_transform=None, wall_weight=3.0):
                 path.append(current)
             return path[::-1]
 
-        for dr, dc in [(-1,0),(1,0),(0,-1),(0,1),(-1,-1),(-1,1),(1,-1),(1,1)]:
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             r, c = current[0] + dr, current[1] + dc
             if not (0 <= r < rows and 0 <= c < cols):
                 continue
             if grid[r][c] == 1:
                 continue
-            # Prevent corner-cutting through diagonal wall gaps
-            if dr != 0 and dc != 0:
-                if grid[current[0] + dr][current[1]] == 1 or \
-                   grid[current[0]][current[1] + dc] == 1:
-                    continue
 
-            is_diag = (dr != 0 and dc != 0)
-            step_cost = SQRT2 if is_diag else 1.0
+            step_cost = 1.0
             if dist_transform is not None:
                 d = float(dist_transform[r, c])
                 if d > 0:
