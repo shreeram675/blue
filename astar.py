@@ -53,38 +53,31 @@ def astar(grid, start, goal, dist_transform=None, wall_weight=3.0):
     return []
 
 # ── PATH SMOOTHING ─────────────────────────────────────────────────────────
-def smooth_path(path, grid):
+def smooth_path(path):
     """
-    Remove unnecessary waypoints.
-    Only keeps points where direction changes — cleaner commands.
+    Collapse consecutive same-direction steps into single segments.
+    Since A* is strictly 4-directional (N/S/E/W), every step has dr,dc in
+    {-1,0,1} with no diagonals.  We only keep waypoints where the direction
+    changes — this produces the minimal axis-aligned polyline whose commands
+    (and canvas corridor) exactly match the robot's physical motion.
+
+    Line-of-sight shortcuts are intentionally NOT used: they create diagonal
+    segments that cross wall corners and generate 45° turn commands that do
+    not correspond to what the robot actually does on a rectilinear grid.
     """
     if len(path) < 3:
         return path
 
-    def line_of_sight(grid, p1, p2):
-        r1, c1 = p1
-        r2, c2 = p2
-        steps = max(abs(r2-r1), abs(c2-c1))
-        if steps == 0:
-            return True
-        for i in range(steps + 1):
-            t = i / steps
-            r = int(round(r1 + t * (r2 - r1)))
-            c = int(round(c1 + t * (c2 - c1)))
-            if grid[r][c] == 1:
-                return False
-        return True
-
     smoothed = [path[0]]
-    i = 0
-    while i < len(path) - 1:
-        j = len(path) - 1
-        while j > i + 1:
-            if line_of_sight(grid, path[i], path[j]):
-                break
-            j -= 1
-        smoothed.append(path[j])
-        i = j
+    for i in range(1, len(path) - 1):
+        dr_in  = path[i][0] - path[i-1][0]
+        dc_in  = path[i][1] - path[i-1][1]
+        dr_out = path[i+1][0] - path[i][0]
+        dc_out = path[i+1][1] - path[i][1]
+        # Keep this cell only if the robot changes direction here
+        if (dr_in, dc_in) != (dr_out, dc_out):
+            smoothed.append(path[i])
+    smoothed.append(path[-1])
     return smoothed
 
 # ── PATH TO COMMANDS ───────────────────────────────────────────────────────
@@ -258,7 +251,7 @@ if __name__ == "__main__":
             print(f"   ❌ No path found")
             continue
 
-        smoothed = smooth_path(path, grid)
+        smoothed = smooth_path(path)
         print(f"   ✅ Raw path: {len(path)} cells")
         print(f"   ✅ Smoothed: {len(smoothed)} waypoints")
 

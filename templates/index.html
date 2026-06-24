@@ -1817,18 +1817,24 @@ function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(blueprintImg, 0, 0);
 
-  // Draw robot-width corridor clipped to inflated-grid free space
+  // Draw robot-width corridor clipped to raw-grid free space
   if (showPathOnCanvas && currentPath && currentPath.length > 1) {
     const robotWidthPx = Math.max(CS, (robotWidthCm / realCmPerCell) * CS);
 
-    // ── Step 1: build the free-space mask from inflated grid data ────────────
-    // Uses EXACTLY the same coordinate formula as the corridor stroke below
-    // (c * CS, r * CS, CS, CS) so alignment is mathematically guaranteed.
+    // ── Step 1: build the free-space mask from the RAW grid ──────────────────
+    // The path runs through inflated free space, but we clip the corridor to raw
+    // walls (structural walls only). This lets the full robot-width corridor be
+    // shown — the inflated safety margin is where the corridor edges sit — and
+    // prevents any visual overlap with actual wall pixels in the blueprint.
     const maskOff = document.createElement('canvas');
     maskOff.width  = canvas.width;
     maskOff.height = canvas.height;
-    if (wallGrid) {
-      const mc = maskOff.getContext('2d');
+    const mc = maskOff.getContext('2d');
+    if (rawMaskImg) {
+      // rawMaskImg: RGBA where alpha=255 = raw free space, alpha=0 = wall
+      mc.drawImage(rawMaskImg, 0, 0, canvas.width, canvas.height);
+    } else if (wallGrid) {
+      // Fallback: build mask from inflated grid if raw mask not yet loaded
       mc.fillStyle = '#fff';
       for (let r = 0; r < wallGrid.length; r++) {
         const row = wallGrid[r];
@@ -1838,23 +1844,48 @@ function redrawCanvas() {
       }
     }
 
-    // ── Step 2: draw corridor on off-screen canvas then clip to mask ─────────
+    // ── Step 2: draw corridor on off-screen canvas with gradient ────────────
     const off = document.createElement('canvas');
     off.width  = canvas.width;
     off.height = canvas.height;
     const oc   = off.getContext('2d');
 
-    oc.strokeStyle = 'rgba(37,99,235,0.55)';
-    oc.lineWidth   = robotWidthPx;
-    oc.lineJoin    = 'round';
-    oc.lineCap     = 'round';
-    oc.beginPath();
-    currentPath.forEach((pt, i) => {
-      const x = pt.col * CS + CS / 2;
-      const y = pt.row * CS + CS / 2;
-      if (i === 0) oc.moveTo(x, y); else oc.lineTo(x, y);
-    });
-    oc.stroke();
+    // Multi-layer corridor: gradient from start to end
+    const pathLen = currentPath.length;
+    if (pathLen > 1) {
+      for (let i = 0; i < pathLen - 1; i++) {
+        const p1 = currentPath[i];
+        const p2 = currentPath[i + 1];
+        const x1 = p1.col * CS + CS / 2;
+        const y1 = p1.row * CS + CS / 2;
+        const x2 = p2.col * CS + CS / 2;
+        const y2 = p2.row * CS + CS / 2;
+
+        // Gradient: start (blue) → mid (cyan) → end (green)
+        const progress = i / (pathLen - 1);
+        let r, g, b;
+        if (progress < 0.5) {
+          const t = progress * 2;
+          r = Math.round(37 + (0 - 37) * t);
+          g = Math.round(99 + (200 - 99) * t);
+          b = Math.round(235 + (235 - 235) * t);
+        } else {
+          const t = (progress - 0.5) * 2;
+          r = Math.round(0 + (22 - 0) * t);
+          g = Math.round(200 + (163 - 200) * t);
+          b = Math.round(235 + (74 - 235) * t);
+        }
+        const opacity = 0.5 + (progress * 0.15);
+        oc.strokeStyle = `rgba(${r},${g},${b},${opacity})`;
+        oc.lineWidth = robotWidthPx;
+        oc.lineJoin = 'round';
+        oc.lineCap = 'round';
+        oc.beginPath();
+        oc.moveTo(x1, y1);
+        oc.lineTo(x2, y2);
+        oc.stroke();
+      }
+    }
 
     // destination-in: keep corridor pixels only where mask is opaque (free cells)
     oc.globalCompositeOperation = 'destination-in';
@@ -1863,13 +1894,13 @@ function redrawCanvas() {
 
     ctx.drawImage(off, 0, 0);
 
-    // ── Step 3: dashed centre line on top ────────────────────────────────────
+    // ── Step 3: Enhanced centre line with direction markers ───────────────────
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth   = Math.max(1, CS / 5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth   = Math.max(1.5, CS / 4);
     ctx.lineJoin    = 'round';
     ctx.lineCap     = 'round';
-    ctx.setLineDash([CS * 1.5, CS]);
+    ctx.setLineDash([CS * 1.2, CS * 0.8]);
     ctx.beginPath();
     currentPath.forEach((pt, i) => {
       const x = pt.col * CS + CS / 2;
@@ -1878,6 +1909,98 @@ function redrawCanvas() {
     });
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // ── Step 4: Milestone markers every 5-10 cells ─────────────────────────────
+    const milestoneInterval = Math.max(5, Math.ceil(pathLen / 8));
+    for (let i = milestoneInterval; i < pathLen; i += milestoneInterval) {
+      const pt = currentPath[i];
+      const x = pt.col * CS + CS / 2;
+      const y = pt.row * CS + CS / 2;
+      const progress = i / pathLen;
+
+      // Milestone dot with number
+      ctx.beginPath();
+      ctx.arc(x, y, CS * 0.25, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${0.3 + progress * 0.4})`;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Milestone number
+      const milestoneNum = Math.floor(i / milestoneInterval);
+      ctx.font = `bold ${Math.max(10, CS * 0.35)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(37,99,235,0.9)';
+      ctx.fillText(milestoneNum, x, y);
+    }
+
+    ctx.restore();
+
+    // ── Step 5: Directional flow arrows along path ──────────────────────────────
+    ctx.save();
+    const arrowInterval = Math.max(8, Math.ceil(pathLen / 10));
+    for (let i = arrowInterval; i < pathLen - 1; i += arrowInterval) {
+      const p1 = currentPath[i];
+      const p2 = currentPath[i + 1];
+      const x1 = p1.col * CS + CS / 2;
+      const y1 = p1.row * CS + CS / 2;
+      const x2 = p2.col * CS + CS / 2;
+      const y2 = p2.row * CS + CS / 2;
+
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const arrowLen = CS * 0.4;
+      const arrowWid = CS * 0.3;
+
+      ctx.translate(x1, y1);
+      ctx.rotate(angle);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.beginPath();
+      ctx.moveTo(arrowLen, 0);
+      ctx.lineTo(arrowLen - arrowWid, -arrowWid / 2);
+      ctx.lineTo(arrowLen - arrowWid, arrowWid / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.rotate(-angle);
+      ctx.translate(-x1, -y1);
+    }
+    ctx.restore();
+  }
+
+  // Start marker (current robot position when path was computed)
+  if (poseSet && currentPath && currentPath.length > 0) {
+    const sx = currentPath[0].col * CS + CS / 2;
+    const sy = currentPath[0].row * CS + CS / 2;
+    const sr = Math.max(6, CS * 0.5);
+    ctx.save();
+
+    // Pulsing glow effect
+    const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
+    ctx.shadowColor = `rgba(34,197,94,${0.3 + pulse * 0.3})`;
+    ctx.shadowBlur  = 12 + pulse * 4;
+
+    // Start circle with gradient
+    const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+    grad.addColorStop(0, 'rgba(34,197,94,0.95)');
+    grad.addColorStop(1, 'rgba(34,197,94,0.4)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, sr, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Start indicator label
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.max(8, CS * 0.3)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('S', sx, sy);
+
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(sx, sy, sr + 2, 0, 2 * Math.PI);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -1885,17 +2008,46 @@ function redrawCanvas() {
   if (navGoal) {
     const gx = navGoal.col * CS + CS / 2;
     const gy = navGoal.row * CS + CS / 2;
-    const gr = Math.max(5, CS * 0.55);
+    const gr = Math.max(6, CS * 0.55);
     ctx.save();
-    ctx.shadowColor = 'rgba(220,38,38,0.45)';
-    ctx.shadowBlur  = 8;
-    ctx.fillStyle   = 'rgba(220,38,38,0.88)';
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth   = 2;
+
+    // Pulsing glow effect
+    const pulse = (Math.sin(Date.now() / 500) + 1) / 2;
+    ctx.shadowColor = `rgba(220,38,38,${0.4 + pulse * 0.4})`;
+    ctx.shadowBlur  = 14 + pulse * 6;
+
+    // Goal circle with gradient
+    const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+    grad.addColorStop(0, 'rgba(220,38,38,0.95)');
+    grad.addColorStop(1, 'rgba(220,38,38,0.3)');
+    ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(gx, gy, gr, 0, 2 * Math.PI);
     ctx.fill();
+
+    // Goal indicator label
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.max(8, CS * 0.35)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('G', gx, gy);
+
+    // Outer ring
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(gx, gy, gr + 3, 0, 2 * Math.PI);
     ctx.stroke();
+
+    // Extra decorative ring
+    ctx.strokeStyle = 'rgba(220,38,38,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([CS * 0.4, CS * 0.3]);
+    ctx.beginPath();
+    ctx.arc(gx, gy, gr + 8, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     ctx.restore();
   }
 
@@ -2012,30 +2164,67 @@ function drawRobot(ctx, cs) {
 // ── CLICK → SET POSE ──────────────────────────────────────────────────────
 document.getElementById("blueprintCanvas").addEventListener("click", async function(e) {
   if (!blueprintImg) return;
-  
+
   const canvas = e.currentTarget;
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const px = (e.clientX - rect.left) * scaleX;
-  const py = (e.clientY - rect.top) * scaleY;
+  const wrap = document.querySelector('.canvas-wrap');
+  const inner = document.getElementById('canvasInner');
+
+  // Account for the canvas position within its container and scaling
+  const canvasRect = canvas.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  const innerRect = inner.getBoundingClientRect();
+
+  // Calculate canvas scale (how much it's zoomed)
+  const canvasDisplayWidth = canvasRect.width;
+  const canvasDisplayHeight = canvasRect.height;
+  const scaleX = canvas.width / canvasDisplayWidth;
+  const scaleY = canvas.height / canvasDisplayHeight;
+
+  // Calculate click position relative to canvas top-left in viewport
+  const clickX = e.clientX - canvasRect.left;
+  const clickY = e.clientY - canvasRect.top;
+
+  // Convert to canvas coordinates
+  const px = clickX * scaleX;
+  const py = clickY * scaleY;
+
   const col = Math.floor(px / cellSizePx);
   const row = Math.floor(py / cellSizePx);
   const heading = parseInt(document.getElementById("headingSelect").value, 10);
 
-  // Visual feedback
+  // Visual feedback for click position
   const ctx = canvas.getContext("2d");
   const cs = cellSizePx;
   const cx = col * cs + cs / 2;
   const cy = row * cs + cs / 2;
-  ctx.strokeStyle = "#ffaa00";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 5]);
+
+  ctx.save();
+  // Animated pulse ring
+  ctx.strokeStyle = "rgba(255,170,0,0.7)";
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 10);
-  ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + 10, cy);
+  ctx.arc(cx, cy, cs * 0.4, 0, 2 * Math.PI);
   ctx.stroke();
+
+  // Crosshair
+  ctx.strokeStyle = "rgba(255,170,0,0.9)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.moveTo(cx - cs * 0.6, cy);
+  ctx.lineTo(cx + cs * 0.6, cy);
+  ctx.moveTo(cx, cy - cs * 0.6);
+  ctx.lineTo(cx, cy + cs * 0.6);
+  ctx.stroke();
+
+  // Center dot
+  ctx.fillStyle = "rgba(255,170,0,0.9)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
+  ctx.fill();
+
   ctx.setLineDash([]);
+  ctx.restore();
 
   // Validate
   try {

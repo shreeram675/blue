@@ -248,7 +248,7 @@ def collect_metrics():
         t0 = time.perf_counter()
         path, visited = astar_metrics(inflated, start, goal, dt, wall_weight=1.0) if start else ([], 0)
         elapsed_ms = (time.perf_counter() - t0) * 1000
-        smoothed = smooth_path(path, inflated) if path else []
+        smoothed = smooth_path(path) if path else []
         commands = path_to_commands(path, real_cm_per_cell=real_cm_per_cell, initial_heading=0) if path else []
         rows.append({
             "blueprint": bp.name,

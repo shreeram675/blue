@@ -501,11 +501,12 @@ def navigate():
 
         raw_np = np.array(state["raw_grid"], dtype=np.uint8)
 
-        def _dist(g):
-            return cv2.distanceTransform((g == 0).astype(np.uint8), cv2.DIST_L2, 5)
-
         # ── Level 1: inflated grid (full safety margins) ──────────────────
-        path = astar(grid_np, start, goal, dist_transform=_dist(grid_np), wall_weight=1.0)
+        # No wall_weight: the inflated grid already keeps the path (robot_width/2 +
+        # safety_margin) cells from every wall, so additional centering is redundant.
+        # Wall-weight centering on a 4-directional grid causes staircase zigzags
+        # (E,N,E,N…) that inflate command count from ~5 to 20+.
+        path = astar(grid_np, start, goal)
         fallback_used = None
 
         # ── Level 2: raw grid (margins stripped, doorways maximally open) ─
@@ -513,7 +514,7 @@ def navigate():
             print("   L1 failed -> trying raw grid (no inflation)")
             raw_start = _snap_to_free(raw_np, start[0], start[1]) or start
             raw_goal  = _snap_to_free(raw_np, goal[0],  goal[1])  or goal
-            path = astar(raw_np, raw_start, raw_goal, dist_transform=_dist(raw_np), wall_weight=1.0)
+            path = astar(raw_np, raw_start, raw_goal)
             if path:
                 fallback_used = "raw_grid"
                 grid_np = raw_np          # use raw grid for smooth/commands
@@ -526,7 +527,7 @@ def navigate():
             opened = cv2.erode(raw_np, np.ones((3, 3), np.uint8))
             open_start = _snap_to_free(opened, start[0], start[1]) or start
             open_goal  = _snap_to_free(opened, goal[0],  goal[1])  or goal
-            path = astar(opened, open_start, open_goal, dist_transform=_dist(opened), wall_weight=1.0)
+            path = astar(opened, open_start, open_goal)
             if path:
                 fallback_used = "opened_doorways"
                 grid_np = opened
@@ -545,7 +546,7 @@ def navigate():
                 "blocked_near": list(hint) if hint else None,
             }), 400
 
-        smoothed = smooth_path(path, grid_np)
+        smoothed = smooth_path(path)
         commands = path_to_commands(
             smoothed,
             cell_size_cm=10,
@@ -555,7 +556,7 @@ def navigate():
 
         state["command_queue"]   = list(commands)
         state["all_commands"]    = list(commands)
-        state["current_path"]    = path
+        state["current_path"]    = smoothed   # use smoothed path so canvas matches commands
         state["nav_start_pose"]  = dict(state["robot_pose"])
         state["last_synced_seq"] = 0   # reset so sync thread re-scans from cmd_1
 
@@ -571,8 +572,8 @@ def navigate():
             "target_room":  matched["name"],
             "start":        list(start),
             "goal":         list(goal),
-            "path_cells":   len(path),
-            "path":         [list(p) for p in path],
+            "path_cells":   len(smoothed),
+            "path":         [list(p) for p in smoothed],
             "commands":     commands,
             "has_path":     True,
             "fallback_used": fallback_used,
